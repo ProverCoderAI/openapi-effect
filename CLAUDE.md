@@ -363,16 +363,3 @@ describe("Message invariants", () => {
 Каждый эффект — это контролируемое взаимодействие с реальным миром.
 
 ПРИНЦИП: Сначала формализуем, потом программируем.
-
----
-
-Issue to solve: https://github.com/ProverCoderAI/openapi-effect/issues/2
-Your prepared branch: issue-2-29d5f88d5892
-Your prepared working directory: /tmp/gh-issue-solver-1769548280133
-Your forked repository: konard/ProverCoderAI-openapi-effect
-Original repository (upstream): ProverCoderAI/openapi-effect
-
-Proceed.
-
-
-Run timestamp: 2026-01-27T21:11:30.868Z
