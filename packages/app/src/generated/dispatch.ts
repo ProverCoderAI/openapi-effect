@@ -11,6 +11,7 @@
 
 import { Effect, Match } from "effect"
 import type { DecodeError } from "../core/api-client/strict-types.js"
+import { asConst, type Json } from "../core/axioms.js"
 import {
   createDispatcher,
   parseJSON,
@@ -37,15 +38,13 @@ const processJsonContent = <S extends number, D>(
     ? Effect.gen(function*() {
       const parsed = yield* parseJSON(status, "application/json", text)
       const decoded = yield* decoder(status, "application/json", text, parsed)
-      return {
+      return asConst({
         status,
         contentType: "application/json" as const,
         body: decoded
-      } as const
+      })
     })
     : Effect.fail(unexpectedContentType(status, ["application/json"], contentType, text))
-
-type Json = null | boolean | number | string | ReadonlyArray<Json> | { readonly [k: string]: Json }
 
 /**
  * Dispatcher for listPets
@@ -105,11 +104,11 @@ export const dispatcherdeletePet = createDispatcher((status, contentType, text) 
   Match.value(status).pipe(
     Match.when(204, () =>
       Effect.succeed(
-        {
+        asConst({
           status: 204,
           contentType: "none" as const,
           body: undefined
-        } as const
+        })
       )),
     Match.when(404, () => processJsonContent(404, contentType, text, Decoders.decodedeletePet_404)),
     Match.when(500, () => processJsonContent(500, contentType, text, Decoders.decodedeletePet_500)),

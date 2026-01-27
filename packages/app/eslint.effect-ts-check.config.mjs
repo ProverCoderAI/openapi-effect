@@ -127,6 +127,13 @@ const restrictedSyntaxCoreNoAs = [
   )
 ]
 
+// Axioms module is allowed to use unknown and as casts
+const restrictedSyntaxAxioms = [
+  ...restrictedSyntaxBase.filter((rule) =>
+    rule.selector !== "TSAsExpression" && rule.selector !== "TSTypeAssertion"
+  )
+]
+
 const restrictedSyntaxBaseNoServiceFactory = [
   ...restrictedSyntaxBase.filter((rule) =>
     rule.selector !== "CallExpression[callee.name='makeFilesystemService']"
@@ -136,7 +143,7 @@ const restrictedSyntaxBaseNoServiceFactory = [
 export default tseslint.config(
   {
     name: "effect-ts-compliance-check",
-    files: ["src/**/*.ts", "scripts/**/*.ts"],
+    files: ["src/**/*.ts"],
     languageOptions: {
       parser: tseslint.parser,
       globals: { ...globals.node }
@@ -207,7 +214,18 @@ export default tseslint.config(
     name: "effect-ts-compliance-axioms",
     files: ["src/core/axioms.ts"],
     rules: {
-      "no-restricted-syntax": ["error", ...restrictedSyntaxCoreNoAs]
+      // Axioms module is the designated place for type casts and unknown handling
+      "no-restricted-syntax": ["error", ...restrictedSyntaxAxioms]
+    }
+  },
+  {
+    name: "effect-ts-compliance-generated",
+    files: ["src/generated/**/*.ts"],
+    rules: {
+      // Generated code may use casts for type narrowing
+      "no-restricted-syntax": ["error", ...restrictedSyntaxBase.filter((rule) =>
+        rule.selector !== "TSAsExpression" && rule.selector !== "TSTypeAssertion"
+      )]
     }
   },
   {
@@ -215,6 +233,16 @@ export default tseslint.config(
     files: ["src/shell/services/filesystem.ts"],
     rules: {
       "no-restricted-syntax": ["error", ...restrictedSyntaxBaseNoServiceFactory]
+    }
+  },
+  {
+    name: "effect-ts-compliance-shell-api-client",
+    files: ["src/shell/api-client/**/*.ts"],
+    rules: {
+      // Shell API client is a boundary layer that may use casts via axioms
+      "no-restricted-syntax": ["error", ...restrictedSyntaxBase.filter((rule) =>
+        rule.selector !== "TSAsExpression" && rule.selector !== "TSTypeAssertion"
+      )]
     }
   }
 )

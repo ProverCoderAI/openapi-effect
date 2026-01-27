@@ -18,9 +18,7 @@ import type { HttpMethod } from "openapi-typescript-helpers"
 import type {
   ApiFailure,
   ApiSuccess,
-  BoundaryError,
   DecodeError,
-  HttpErrorVariants,
   OperationFor,
   ParseError,
   ResponsesFor,
@@ -28,15 +26,17 @@ import type {
   UnexpectedContentType,
   UnexpectedStatus
 } from "../../core/api-client/strict-types.js"
+import {
+  asDispatcher,
+  asJson,
+  asRawResponse,
+  asStrictRequestInit,
+  type Dispatcher,
+  type Json,
+  type RawResponse
+} from "../../core/axioms.js"
 
-/**
- * Raw HTTP response from fetch
- */
-export type RawResponse = {
-  readonly status: number
-  readonly headers: Headers
-  readonly text: string
-}
+// Re-export Dispatcher type for consumers
 
 /**
  * Decoder for response body
@@ -49,20 +49,6 @@ export type Decoder<T> = (
   contentType: string,
   body: string
 ) => Effect.Effect<T, DecodeError>
-
-/**
- * Dispatcher classifies response and applies decoder
- *
- * @pure false - applies decoders
- * @effect Effect<Success, HttpError | BoundaryError, never>
- * @invariant Must handle all statuses and content-types from schema
- */
-export type Dispatcher<Responses> = (
-  response: RawResponse
-) => Effect.Effect<
-  ApiSuccess<Responses> | HttpErrorVariants<Responses>,
-  Exclude<BoundaryError, TransportError>
->
 
 /**
  * Configuration for a strict API client request
@@ -104,11 +90,11 @@ export const executeRequest = <Responses>(
       Effect.gen(function*() {
         const response = yield* client.execute(request)
         const text = yield* response.text
-        return {
+        return asRawResponse({
           status: response.status,
           headers: toNativeHeaders(response.headers),
           text
-        } as RawResponse
+        })
       }),
       (error): TransportError => ({
         _tag: "TransportError",
@@ -198,30 +184,25 @@ const toNativeHeaders = (platformHeaders: { readonly [key: string]: string }): H
  * to work with any response variant without requiring exact type matching.
  * The classify function can return any Effect with union types for success/error.
  *
- * NOTE: Uses 'unknown' for the classify parameter to allow heterogeneous Effect
+ * NOTE: Uses axioms module for type casts to allow heterogeneous Effect
  * unions from switch statements. The returned Dispatcher is properly typed.
  *
  * @pure true - returns pure function
  * @complexity O(1)
  */
 
-export const createDispatcher = <Responses = any>(
+export const createDispatcher = <Responses>(
   classify: (
     status: number,
     contentType: string | undefined,
     text: string
-  ) => Effect.Effect<any, any>
+  ) => Effect.Effect<unknown, unknown>
 ): Dispatcher<Responses> => {
-  return ((response: RawResponse) => {
+  return asDispatcher<Responses>((response: RawResponse) => {
     const contentType = response.headers.get("content-type") ?? undefined
     return classify(response.status, contentType, response.text)
-  }) as any as Dispatcher<Responses>
+  })
 }
-
-/**
- * JSON value type - result of JSON.parse()
- */
-type Json = null | boolean | number | string | ReadonlyArray<Json> | { readonly [k: string]: Json }
 
 /**
  * Helper to parse JSON with error handling
@@ -235,7 +216,7 @@ export const parseJSON = (
   text: string
 ): Effect.Effect<Json, ParseError> =>
   Effect.try({
-    try: () => JSON.parse(text) as Json,
+    try: () => asJson(JSON.parse(text)),
     catch: (error): ParseError => ({
       _tag: "ParseError",
       status,
@@ -378,14 +359,14 @@ export const createStrictClient = <Paths extends object>(): StrictClient<
 
     // Build config object, only including optional properties if they are defined
     // This satisfies exactOptionalPropertyTypes constraint
-    const config = {
+    const config = asStrictRequestInit<StrictRequestInit<ResponsesFor<OperationFor<Paths, Path, Method>>>>({
       method,
       url,
       dispatcher: options.dispatcher,
       ...(options.headers !== undefined && { headers: options.headers }),
       ...(options.body !== undefined && { body: options.body }),
       ...(options.signal !== undefined && { signal: options.signal })
-    } as StrictRequestInit<ResponsesFor<OperationFor<Paths, Path, Method>>>
+    })
 
     return executeRequest(config)
   }
@@ -398,3 +379,5 @@ export const createStrictClient = <Paths extends object>(): StrictClient<
     DELETE: (path, options) => makeRequest("delete", path, options)
   } satisfies StrictClient<Paths>
 }
+
+export { type Dispatcher, type RawResponse } from "../../core/axioms.js"
