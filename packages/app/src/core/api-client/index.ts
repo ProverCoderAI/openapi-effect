@@ -1,4 +1,4 @@
-// CHANGE: Main entry point for strict-effect-api-client package
+// CHANGE: Main entry point for api-client core module
 // WHY: Export public API with clear separation of concerns
 // QUOTE(ТЗ): "Публичный API должен иметь вид: strictClient.GET(path, options): Effect<ApiSuccess<Op>, ApiFailure<Op>, never>"
 // REF: issue-2, section 6
@@ -25,25 +25,6 @@ export type {
   TransportError,
   UnexpectedContentType,
   UnexpectedStatus
-} from "./core/strict-types.js"
+} from "./strict-types.js"
 
-export { assertNever } from "./core/strict-types.js"
-
-// Shell types and functions (runtime)
-export type {
-  Decoder,
-  Dispatcher,
-  RawResponse,
-  RequestOptions,
-  StrictClient,
-  StrictRequestInit
-} from "./shell/strict-client.js"
-
-export {
-  createDispatcher,
-  createStrictClient,
-  executeRequest,
-  parseJSON,
-  unexpectedContentType,
-  unexpectedStatus
-} from "./shell/strict-client.js"
+export { assertNever } from "./strict-types.js"

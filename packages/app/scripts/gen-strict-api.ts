@@ -75,8 +75,8 @@ const generateDispatchFile = () => {
 // COMPLEXITY: O(1) per dispatch (switch lookup)
 
 import { Effect } from "effect"
-import type { Dispatcher } from "../shell/strict-client.js"
-import { createDispatcher, parseJSON, unexpectedContentType, unexpectedStatus } from "../shell/strict-client.js"
+import type { Dispatcher } from "../shell/api-client/strict-client.js"
+import { createDispatcher, parseJSON, unexpectedContentType, unexpectedStatus } from "../shell/api-client/strict-client.js"
 import * as Decoders from "./decoders.js"
 `)
 
@@ -196,7 +196,7 @@ const generateDecodersFile = () => {
 // COMPLEXITY: O(n) where n = size of parsed object
 
 import { Effect } from "effect"
-import type { DecodeError } from "../core/strict-types.js"
+import type { DecodeError } from "../core/api-client/strict-types.js"
 
 `.trimStart())
 

@@ -10,7 +10,7 @@
 // COMPLEXITY: O(n) where n = size of parsed object
 
 import { Effect } from "effect"
-import type { DecodeError } from "../core/strict-types.js"
+import type { DecodeError } from "../core/api-client/strict-types.js"
 
 /**
  * Decoder for listPets status 200 (application/json)
@@ -311,14 +311,3 @@ export const decodedeletePet_500 = (
     //   })
     // )
 }
-
-
-
-
-
-
-
-
-
-
-

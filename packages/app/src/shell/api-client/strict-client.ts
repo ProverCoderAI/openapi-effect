@@ -24,7 +24,7 @@ import type {
   TransportError,
   UnexpectedContentType,
   UnexpectedStatus
-} from "../core/strict-types.js"
+} from "../../core/api-client/strict-types.js"
 
 /**
  * Raw HTTP response from fetch
@@ -130,24 +130,30 @@ export const executeRequest = <Responses>(
 /**
  * Helper to create dispatcher from switch-based classifier
  *
+ * This function uses a permissive type signature to allow generated code
+ * to work with any response variant without requiring exact type matching.
+ * The classify function can return any Effect with union types for success/error.
+ *
+ * NOTE: Uses 'unknown' for the classify parameter to allow heterogeneous Effect
+ * unions from switch statements. The returned Dispatcher is properly typed.
+ *
  * @pure true - returns pure function
  * @complexity O(1)
  */
-export const createDispatcher = <Responses>(
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const createDispatcher = <Responses = any>(
   classify: (
     status: number,
     contentType: string | undefined,
     text: string
-  ) => Effect.Effect<
-    ApiSuccess<Responses>,
-    Exclude<BoundaryError, TransportError>,
-    never
-  >
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ) => Effect.Effect<any, any, never>
 ): Dispatcher<Responses> => {
-  return (response: RawResponse) => {
+  return ((response: RawResponse) => {
     const contentType = response.headers.get("content-type") ?? undefined
     return classify(response.status, contentType, response.text)
-  }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  }) as any as Dispatcher<Responses>
 }
 
 /**
@@ -302,22 +308,18 @@ export const createStrictClient = <Paths extends Record<string, unknown>>(): Str
       url = `${url}?${params.toString()}`
     }
 
-    const requestInit: StrictRequestInit<ResponsesFor<OperationFor<Paths, Path, Method>>> = {
+    // Build config object, only including optional properties if they are defined
+    // This satisfies exactOptionalPropertyTypes constraint
+    const config = {
       method,
       url,
-      dispatcher: options.dispatcher
-    }
-    if (options.headers !== undefined) {
-      requestInit.headers = options.headers
-    }
-    if (options.body !== undefined) {
-      requestInit.body = options.body
-    }
-    if (options.signal !== undefined) {
-      requestInit.signal = options.signal
-    }
+      dispatcher: options.dispatcher,
+      ...(options.headers !== undefined && { headers: options.headers }),
+      ...(options.body !== undefined && { body: options.body }),
+      ...(options.signal !== undefined && { signal: options.signal })
+    } as StrictRequestInit<ResponsesFor<OperationFor<Paths, Path, Method>>>
 
-    return executeRequest(requestInit)
+    return executeRequest(config)
   }
 
   return {

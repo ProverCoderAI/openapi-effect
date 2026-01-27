@@ -10,8 +10,7 @@
 // COMPLEXITY: O(1) per dispatch (switch lookup)
 
 import { Effect } from "effect"
-import type { Dispatcher } from "../shell/strict-client.js"
-import { createDispatcher, parseJSON, unexpectedContentType, unexpectedStatus } from "../shell/strict-client.js"
+import { createDispatcher, parseJSON, unexpectedContentType, unexpectedStatus } from "../shell/api-client/strict-client.js"
 import * as Decoders from "./decoders.js"
 
 /**
@@ -21,7 +20,7 @@ import * as Decoders from "./decoders.js"
  * @pure false - applies decoders
  * @invariant Exhaustive coverage of all schema statuses
  */
-export const dispatcherlistPets: Dispatcher<any> = createDispatcher((status, contentType, text) => {
+export const dispatcherlistPets = createDispatcher((status, contentType, text) => {
     switch (status) {
         case 200:
             if (contentType?.includes("application/json")) {
@@ -61,7 +60,7 @@ export const dispatcherlistPets: Dispatcher<any> = createDispatcher((status, con
  * @pure false - applies decoders
  * @invariant Exhaustive coverage of all schema statuses
  */
-export const dispatchercreatePet: Dispatcher<any> = createDispatcher((status, contentType, text) => {
+export const dispatchercreatePet = createDispatcher((status, contentType, text) => {
     switch (status) {
         case 201:
             if (contentType?.includes("application/json")) {
@@ -114,7 +113,7 @@ export const dispatchercreatePet: Dispatcher<any> = createDispatcher((status, co
  * @pure false - applies decoders
  * @invariant Exhaustive coverage of all schema statuses
  */
-export const dispatchergetPet: Dispatcher<any> = createDispatcher((status, contentType, text) => {
+export const dispatchergetPet = createDispatcher((status, contentType, text) => {
     switch (status) {
         case 200:
             if (contentType?.includes("application/json")) {
@@ -167,7 +166,7 @@ export const dispatchergetPet: Dispatcher<any> = createDispatcher((status, conte
  * @pure false - applies decoders
  * @invariant Exhaustive coverage of all schema statuses
  */
-export const dispatcherdeletePet: Dispatcher<any> = createDispatcher((status, contentType, text) => {
+export const dispatcherdeletePet = createDispatcher((status, contentType, text) => {
     switch (status) {
         case 204:
             return Effect.succeed({
@@ -205,7 +204,3 @@ export const dispatcherdeletePet: Dispatcher<any> = createDispatcher((status, co
             return Effect.fail(unexpectedStatus(status, text))
     }
 })
-
-
-
-
