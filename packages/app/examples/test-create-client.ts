@@ -72,6 +72,7 @@ const listAllPetsExample = Effect.gen(function*() {
  * Example program: Get specific pet
  *
  * Demonstrates handling multiple HTTP error statuses (404, 500).
+ * Uses Match.exhaustive to force handling ALL schema-defined statuses.
  *
  * @pure false - performs HTTP request
  */
@@ -92,12 +93,13 @@ const getPetExample = Effect.gen(function*() {
   yield* Console.log(`Success: Got pet "${result.body.name}"`)
   yield* Console.log(`  Tag: ${result.body.tag ?? "none"}`)
 }).pipe(
-  // Handle HTTP errors using Match for exhaustive pattern matching
+  // Handle HTTP errors using Match.exhaustive - forces handling ALL schema statuses
+  // CRITICAL: Match.exhaustive, not Match.orElse!
   Effect.catchTag("HttpError", (error) =>
     Match.value(error.status).pipe(
       Match.when(404, () => Console.log(`Not found: ${JSON.stringify(error.body)}`)),
       Match.when(500, () => Console.log(`Server error: ${JSON.stringify(error.body)}`)),
-      Match.orElse(() => Console.log(`Unexpected HTTP error: ${error.status}`))
+      Match.exhaustive // Forces handling all 404 | 500 - no escape hatch
     )),
   Effect.catchTag("TransportError", (error) =>
     Console.log(`Transport error: ${error.error.message}`))
@@ -107,6 +109,7 @@ const getPetExample = Effect.gen(function*() {
  * Example program: Create new pet
  *
  * Demonstrates handling validation errors (400).
+ * Uses Match.exhaustive to force handling ALL schema-defined statuses.
  *
  * @pure false - performs HTTP request
  */
@@ -134,11 +137,12 @@ const createPetExample = Effect.gen(function*() {
   yield* Console.log(`  Name: ${result.body.name}`)
 }).pipe(
   // Handle HTTP errors - FORCED by TypeScript!
+  // CRITICAL: Match.exhaustive, not Match.orElse!
   Effect.catchTag("HttpError", (error) =>
     Match.value(error.status).pipe(
       Match.when(400, () => Console.log(`Validation error: ${JSON.stringify(error.body)}`)),
       Match.when(500, () => Console.log(`Server error: ${JSON.stringify(error.body)}`)),
-      Match.orElse(() => Console.log(`Unexpected HTTP error: ${error.status}`))
+      Match.exhaustive // Forces handling all 400 | 500 - no escape hatch
     )),
   Effect.catchTag("TransportError", (error) =>
     Console.log(`Transport error: ${error.error.message}`))
