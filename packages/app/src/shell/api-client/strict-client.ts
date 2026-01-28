@@ -5,7 +5,7 @@
 // SOURCE: n/a
 // FORMAT THEOREM: ∀ req ∈ Requests: execute(req) → Effect<Success, Failure, never>
 // PURITY: SHELL
-// EFFECT: Effect<ApiSuccess<Op>, ApiFailure<Op>, HttpClient.HttpClient>
+// EFFECT: Effect<ApiResponse<Op>, BoundaryError, HttpClient.HttpClient>
 // INVARIANT: No exceptions escape; all errors typed in Effect channel
 // COMPLEXITY: O(1) per request / O(n) for body size
 
@@ -16,8 +16,8 @@ import { Effect } from "effect"
 import type { HttpMethod } from "openapi-typescript-helpers"
 
 import type {
-  ApiFailure,
-  ApiSuccess,
+  ApiResponse,
+  BoundaryError,
   DecodeError,
   OperationFor,
   ParseError,
@@ -69,7 +69,7 @@ export type StrictRequestInit<Responses> = {
  * @returns Effect with typed success and all possible failures
  *
  * @pure false - performs HTTP request
- * @effect Effect<ApiSuccess<Responses>, ApiFailure<Responses>, HttpClient.HttpClient>
+ * @effect Effect<ApiResponse<Responses>, BoundaryError, HttpClient.HttpClient>
  * @invariant No exceptions escape; all errors in Effect.fail channel
  * @precondition config.dispatcher handles all schema statuses
  * @postcondition ∀ response: classified ∨ BoundaryError
@@ -77,7 +77,7 @@ export type StrictRequestInit<Responses> = {
  */
 export const executeRequest = <Responses>(
   config: StrictRequestInit<Responses>
-): Effect.Effect<ApiSuccess<Responses>, ApiFailure<Responses>, HttpClient.HttpClient> =>
+): Effect.Effect<ApiResponse<Responses>, BoundaryError, HttpClient.HttpClient> =>
   Effect.gen(function*() {
     // STEP 1: Get HTTP client from context
     const client = yield* HttpClient.HttpClient
@@ -259,15 +259,15 @@ export const unexpectedContentType = (
  * Generic client interface for any OpenAPI schema
  *
  * @pure false - performs HTTP requests
- * @effect Effect<ApiSuccess<Op>, ApiFailure<Op>, HttpClient.HttpClient>
+ * @effect Effect<ApiResponse<Op>, BoundaryError, HttpClient.HttpClient>
  */
 export type StrictClient<Paths extends object> = {
   readonly GET: <Path extends keyof Paths>(
     path: Path,
     options: RequestOptions<Paths, Path, "get">
   ) => Effect.Effect<
-    ApiSuccess<ResponsesFor<OperationFor<Paths, Path, "get">>>,
-    ApiFailure<ResponsesFor<OperationFor<Paths, Path, "get">>>,
+    ApiResponse<ResponsesFor<OperationFor<Paths, Path, "get">>>,
+    BoundaryError,
     HttpClient.HttpClient
   >
 
@@ -275,8 +275,8 @@ export type StrictClient<Paths extends object> = {
     path: Path,
     options: RequestOptions<Paths, Path, "post">
   ) => Effect.Effect<
-    ApiSuccess<ResponsesFor<OperationFor<Paths, Path, "post">>>,
-    ApiFailure<ResponsesFor<OperationFor<Paths, Path, "post">>>,
+    ApiResponse<ResponsesFor<OperationFor<Paths, Path, "post">>>,
+    BoundaryError,
     HttpClient.HttpClient
   >
 
@@ -284,8 +284,8 @@ export type StrictClient<Paths extends object> = {
     path: Path,
     options: RequestOptions<Paths, Path, "put">
   ) => Effect.Effect<
-    ApiSuccess<ResponsesFor<OperationFor<Paths, Path, "put">>>,
-    ApiFailure<ResponsesFor<OperationFor<Paths, Path, "put">>>,
+    ApiResponse<ResponsesFor<OperationFor<Paths, Path, "put">>>,
+    BoundaryError,
     HttpClient.HttpClient
   >
 
@@ -293,8 +293,8 @@ export type StrictClient<Paths extends object> = {
     path: Path,
     options: RequestOptions<Paths, Path, "patch">
   ) => Effect.Effect<
-    ApiSuccess<ResponsesFor<OperationFor<Paths, Path, "patch">>>,
-    ApiFailure<ResponsesFor<OperationFor<Paths, Path, "patch">>>,
+    ApiResponse<ResponsesFor<OperationFor<Paths, Path, "patch">>>,
+    BoundaryError,
     HttpClient.HttpClient
   >
 
@@ -302,8 +302,8 @@ export type StrictClient<Paths extends object> = {
     path: Path,
     options: RequestOptions<Paths, Path, "delete">
   ) => Effect.Effect<
-    ApiSuccess<ResponsesFor<OperationFor<Paths, Path, "delete">>>,
-    ApiFailure<ResponsesFor<OperationFor<Paths, Path, "delete">>>,
+    ApiResponse<ResponsesFor<OperationFor<Paths, Path, "delete">>>,
+    BoundaryError,
     HttpClient.HttpClient
   >
 }

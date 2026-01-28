@@ -12,7 +12,7 @@ export type { ClientOptions, StrictApiClient } from "./shell/api-client/create-c
 
 // Core types (for advanced type manipulation)
 export type {
-  ApiFailure,
+  ApiResponse,
   ApiSuccess,
   BodyFor,
   BoundaryError,

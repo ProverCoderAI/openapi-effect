@@ -1,27 +1,16 @@
-// CHANGE: Example script demonstrating createClient API usage
-// WHY: Verify simplified API works as requested by reviewer
-// QUOTE(TZ): "napishi dlya menya takoi testovyi skript i prover' kak ono rabotaet"
+// CHANGE: Example script demonstrating createClient API usage with automatic type inference
+// WHY: Verify simplified API works as requested by reviewer without explicit type annotations
+// QUOTE(TZ): "А почему он заставляет явно описать тип? apiClient.GET и так должен вернуть тип"
 // REF: PR#3 comment from skulidropek
 // SOURCE: n/a
 // PURITY: SHELL
-// EFFECT: Demonstrates Effect-based API calls
+// EFFECT: Demonstrates Effect-based API calls with automatic type inference
 
 import * as FetchHttpClient from "@effect/platform/FetchHttpClient"
 import { Console, Effect, Exit } from "effect"
 import { createClient, type ClientOptions } from "../src/shell/api-client/create-client.js"
 import { dispatchercreatePet, dispatchergetPet, dispatcherlistPets } from "../src/generated/dispatch.js"
-import type { Operations, Paths } from "../tests/fixtures/petstore.openapi.js"
-import type { ApiSuccess, ResponsesFor } from "../src/core/api-client/strict-types.js"
-
-// Type aliases for operation responses
-type ListPetsResponses = ResponsesFor<Operations["listPets"]>
-type GetPetResponses = ResponsesFor<Operations["getPet"]>
-type CreatePetResponses = ResponsesFor<Operations["createPet"]>
-
-// Success types for pattern matching
-type ListPetsSuccess = ApiSuccess<ListPetsResponses>
-type GetPetSuccess = ApiSuccess<GetPetResponses>
-type CreatePetSuccess = ApiSuccess<CreatePetResponses>
+import type { Paths } from "../tests/fixtures/petstore.openapi.js"
 
 // Helper type for Error schema body
 type ErrorBody = { readonly code: number; readonly message: string }
@@ -49,14 +38,17 @@ const apiClient = createClient<Paths>(clientOptions)
 /**
  * Example program: List all pets
  *
+ * NOTE: Types are now automatically inferred from the dispatcher!
+ * No explicit type annotation needed on the result variable.
+ *
  * @pure false - performs HTTP request
- * @effect Effect<void, ListPetsFailure, HttpClient>
  */
 const listAllPetsExample = Effect.gen(function*() {
   yield* Console.log("=== Example 1: List all pets ===")
 
-  // Execute request using the simplified API
-  const result: ListPetsSuccess = yield* apiClient.GET(
+  // Execute request - type is automatically inferred from dispatcherlistPets
+  // No need for explicit type annotation!
+  const result = yield* apiClient.GET(
     "/pets",
     dispatcherlistPets,
     {
@@ -64,7 +56,7 @@ const listAllPetsExample = Effect.gen(function*() {
     }
   )
 
-  // Pattern match on the response
+  // Pattern match on the response - TypeScript knows the possible statuses
   if (result.status === 200) {
     const pets = result.body as Array<{ id: string; name: string; tag?: string }>
     yield* Console.log(`Success: Got ${pets.length} pets`)
@@ -77,13 +69,15 @@ const listAllPetsExample = Effect.gen(function*() {
 /**
  * Example program: Get specific pet
  *
+ * Demonstrates path parameters with automatic type inference.
+ *
  * @pure false - performs HTTP request
- * @effect Effect<void, GetPetFailure, HttpClient>
  */
 const getPetExample = Effect.gen(function*() {
   yield* Console.log("\n=== Example 2: Get specific pet ===")
 
-  const result: GetPetSuccess = yield* apiClient.GET(
+  // Type is inferred from dispatchergetPet - no annotation needed!
+  const result = yield* apiClient.GET(
     "/pets/{petId}",
     dispatchergetPet,
     {
@@ -105,8 +99,9 @@ const getPetExample = Effect.gen(function*() {
 /**
  * Example program: Create new pet
  *
+ * Demonstrates POST requests with body.
+ *
  * @pure false - performs HTTP request
- * @effect Effect<void, CreatePetFailure, HttpClient>
  */
 const createPetExample = Effect.gen(function*() {
   yield* Console.log("\n=== Example 3: Create new pet ===")
@@ -116,7 +111,8 @@ const createPetExample = Effect.gen(function*() {
     tag: "cat"
   }
 
-  const result: CreatePetSuccess = yield* apiClient.POST(
+  // Type is inferred from dispatchercreatePet - no annotation needed!
+  const result = yield* apiClient.POST(
     "/pets",
     dispatchercreatePet,
     {
@@ -139,8 +135,9 @@ const createPetExample = Effect.gen(function*() {
 /**
  * Example program: Handle transport error
  *
+ * Demonstrates error handling with Effect.either.
+ *
  * @pure false - performs HTTP request
- * @effect Effect<void, never, HttpClient>
  */
 const errorHandlingExample = Effect.gen(function*() {
   yield* Console.log("\n=== Example 4: Error handling ===")
@@ -180,17 +177,17 @@ type ApiError = { readonly _tag: string }
  * Main program - runs all examples
  *
  * @pure false - performs HTTP requests
- * @effect Effect<void, never, HttpClient>
  */
 const mainProgram = Effect.gen(function*() {
   yield* Console.log("========================================")
   yield* Console.log("  OpenAPI Effect Client - Examples")
   yield* Console.log("========================================\n")
 
-  yield* Console.log("Demonstrating simplified API:")
+  yield* Console.log("Demonstrating simplified API with automatic type inference:")
   yield* Console.log('  import createClient from "openapi-effect"')
   yield* Console.log("  const client = createClient<Paths>({ ... })")
-  yield* Console.log("  client.GET(\"/path\", dispatcher, options)\n")
+  yield* Console.log("  const result = yield* client.GET(\"/path\", dispatcher)")
+  yield* Console.log("  // result is automatically typed!\n")
 
   // Note: These examples will fail with transport errors since
   // we're not connecting to a real server. This is intentional
@@ -212,10 +209,9 @@ const mainProgram = Effect.gen(function*() {
 
   yield* Console.log("\nAll examples completed!")
   yield* Console.log("\nType safety verification:")
-  yield* Console.log("  - All paths are type-checked against OpenAPI schema")
-  yield* Console.log("  - Path parameters validated at compile time")
-  yield* Console.log("  - Query parameters type-safe")
-  yield* Console.log("  - Response bodies fully typed")
+  yield* Console.log("  - Response types automatically inferred from dispatcher")
+  yield* Console.log("  - No explicit type annotations required")
+  yield* Console.log("  - All paths type-checked against OpenAPI schema")
   yield* Console.log("  - All errors explicit in Effect type")
 })
 

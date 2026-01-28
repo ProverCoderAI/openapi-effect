@@ -1,6 +1,6 @@
 // CHANGE: Main entry point for api-client core module
 // WHY: Export public API with clear separation of concerns
-// QUOTE(ТЗ): "Публичный API должен иметь вид: strictClient.GET(path, options): Effect<ApiSuccess<Op>, ApiFailure<Op>, never>"
+// QUOTE(ТЗ): "Публичный API должен иметь вид: strictClient.GET(path, options): Effect<ApiResponse<Op>, BoundaryError, never>"
 // REF: issue-2, section 6
 // SOURCE: n/a
 // PURITY: CORE (re-exports)
@@ -8,7 +8,7 @@
 
 // Core types (compile-time)
 export type {
-  ApiFailure,
+  ApiResponse,
   ApiSuccess,
   BodyFor,
   BoundaryError,

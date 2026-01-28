@@ -10,7 +10,8 @@
 // COMPLEXITY: O(1) per dispatch (Match lookup)
 
 import { Effect, Match } from "effect"
-import type { DecodeError } from "../core/api-client/strict-types.js"
+import type { Operations } from "../../tests/fixtures/petstore.openapi.js"
+import type { DecodeError, ResponsesFor } from "../core/api-client/strict-types.js"
 import { asConst, type Json } from "../core/axioms.js"
 import {
   createDispatcher,
@@ -19,6 +20,12 @@ import {
   unexpectedStatus
 } from "../shell/api-client/strict-client.js"
 import * as Decoders from "./decoders.js"
+
+// Response types for each operation - used for type inference
+type ListPetsResponses = ResponsesFor<Operations["listPets"]>
+type CreatePetResponses = ResponsesFor<Operations["createPet"]>
+type GetPetResponses = ResponsesFor<Operations["getPet"]>
+type DeletePetResponses = ResponsesFor<Operations["deletePet"]>
 
 /**
  * Helper: process JSON content type for a given status
@@ -53,7 +60,7 @@ const processJsonContent = <S extends number, D>(
  * @pure false - applies decoders
  * @invariant Exhaustive coverage of all schema statuses
  */
-export const dispatcherlistPets = createDispatcher((status, contentType, text) =>
+export const dispatcherlistPets = createDispatcher<ListPetsResponses>((status, contentType, text) =>
   Match.value(status).pipe(
     Match.when(200, () => processJsonContent(200, contentType, text, Decoders.decodelistPets_200)),
     Match.when(500, () => processJsonContent(500, contentType, text, Decoders.decodelistPets_500)),
@@ -68,7 +75,7 @@ export const dispatcherlistPets = createDispatcher((status, contentType, text) =
  * @pure false - applies decoders
  * @invariant Exhaustive coverage of all schema statuses
  */
-export const dispatchercreatePet = createDispatcher((status, contentType, text) =>
+export const dispatchercreatePet = createDispatcher<CreatePetResponses>((status, contentType, text) =>
   Match.value(status).pipe(
     Match.when(201, () => processJsonContent(201, contentType, text, Decoders.decodecreatePet_201)),
     Match.when(400, () => processJsonContent(400, contentType, text, Decoders.decodecreatePet_400)),
@@ -84,7 +91,7 @@ export const dispatchercreatePet = createDispatcher((status, contentType, text) 
  * @pure false - applies decoders
  * @invariant Exhaustive coverage of all schema statuses
  */
-export const dispatchergetPet = createDispatcher((status, contentType, text) =>
+export const dispatchergetPet = createDispatcher<GetPetResponses>((status, contentType, text) =>
   Match.value(status).pipe(
     Match.when(200, () => processJsonContent(200, contentType, text, Decoders.decodegetPet_200)),
     Match.when(404, () => processJsonContent(404, contentType, text, Decoders.decodegetPet_404)),
@@ -100,7 +107,7 @@ export const dispatchergetPet = createDispatcher((status, contentType, text) =>
  * @pure false - applies decoders
  * @invariant Exhaustive coverage of all schema statuses
  */
-export const dispatcherdeletePet = createDispatcher((status, contentType, text) =>
+export const dispatcherdeletePet = createDispatcher<DeletePetResponses>((status, contentType, text) =>
   Match.value(status).pipe(
     Match.when(204, () =>
       Effect.succeed(

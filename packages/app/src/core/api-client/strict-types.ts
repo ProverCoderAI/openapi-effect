@@ -182,15 +182,15 @@ export type BoundaryError =
   | DecodeError
 
 /**
- * Complete failure type for an operation
+ * All response variants from schema (both success and error statuses)
  *
  * @pure true - compile-time only
- * @invariant Failure = HttpError ⊎ BoundaryError (disjoint union)
+ * @invariant Result = SuccessVariants ⊎ HttpErrorVariants (all schema responses)
  */
-export type ApiFailure<Responses> = HttpErrorVariants<Responses> | BoundaryError
+export type ApiResponse<Responses> = SuccessVariants<Responses> | HttpErrorVariants<Responses>
 
 /**
- * Success type for an operation
+ * Success type for an operation (2xx statuses only)
  *
  * @pure true - compile-time only
  */

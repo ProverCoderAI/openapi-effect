@@ -26,7 +26,7 @@
  * @pure true
  */
 import type { Effect } from "effect"
-import type { ApiSuccess, BoundaryError, HttpErrorVariants, TransportError } from "./api-client/strict-types.js"
+import type { ApiResponse, BoundaryError, TransportError } from "./api-client/strict-types.js"
 
 export type Json =
   | null
@@ -75,14 +75,17 @@ export const asRawResponse = (value: {
 /**
  * Dispatcher classifies response and applies decoder
  *
+ * Returns all schema-defined responses (both 2xx and non-2xx) in success channel.
+ * Only boundary errors (parse, decode, unexpected status/content-type) go to error channel.
+ *
  * @pure false - applies decoders
- * @effect Effect<Success, HttpError | BoundaryError, never>
+ * @effect Effect<ApiResponse, BoundaryError, never>
  * @invariant Must handle all statuses and content-types from schema
  */
 export type Dispatcher<Responses> = (
   response: RawResponse
 ) => Effect.Effect<
-  ApiSuccess<Responses> | HttpErrorVariants<Responses>,
+  ApiResponse<Responses>,
   Exclude<BoundaryError, TransportError>
 >
 

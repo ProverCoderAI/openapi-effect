@@ -1,5 +1,5 @@
-// CHANGE: Add high-level createClient API for simplified usage
-// WHY: Provide convenient wrapper matching openapi-fetch ergonomics
+// CHANGE: Add high-level createClient API for simplified usage with proper type inference
+// WHY: Provide convenient wrapper matching openapi-fetch ergonomics with automatic type inference
 // QUOTE(ТЗ): "Я хочу что бы я мог писать вот такой код: import createClient from \"openapi-effect\"; export const apiClient = createClient<path>({ baseUrl: \"\", credentials: \"include\" });"
 // REF: PR#3 comment from skulidropek
 // SOURCE: n/a
@@ -8,9 +8,11 @@
 // INVARIANT: All operations preserve Effect-based error handling
 // COMPLEXITY: O(1) client creation
 
+import type * as HttpClient from "@effect/platform/HttpClient"
+import type { Effect } from "effect"
 import type { HttpMethod } from "openapi-typescript-helpers"
 
-import type { ResponsesFor } from "../../core/api-client/strict-types.js"
+import type { ApiResponse, BoundaryError } from "../../core/api-client/strict-types.js"
 import { asStrictRequestInit, type Dispatcher } from "../../core/axioms.js"
 import type { StrictRequestInit } from "./strict-client.js"
 import { executeRequest } from "./strict-client.js"
@@ -43,81 +45,83 @@ export type RequestOptions = {
 /**
  * Type-safe API client with Effect-based operations
  *
+ * The Responses type is inferred from the Dispatcher parameter, which allows
+ * TypeScript to automatically determine success/failure types without explicit annotations.
+ *
  * @typeParam Paths - OpenAPI paths type from openapi-typescript
  *
  * @pure false - operations perform HTTP requests
- * @effect All methods return Effect<Success, Failure, never>
+ * @effect All methods return Effect<ApiSuccess<Responses>, BoundaryError, HttpClient>
  */
 export type StrictApiClient<Paths extends object> = {
-  readonly GET: <
-    Path extends Extract<keyof Paths, string>,
-    Op = Paths[Path] extends { get: infer G } ? G : never,
-    Responses = ResponsesFor<Op>
-  >(
-    path: Path,
+  /**
+   * Execute GET request
+   *
+   * @typeParam Responses - Response types (inferred from dispatcher)
+   * @param path - API path
+   * @param dispatcher - Response dispatcher (provides type inference)
+   * @param options - Optional request options
+   * @returns Effect with typed response (discriminate on status) and boundary errors
+   */
+  readonly GET: <Responses>(
+    path: Extract<keyof Paths, string>,
     dispatcher: Dispatcher<Responses>,
     options?: RequestOptions
-  ) => ReturnType<typeof executeRequest<Responses>>
+  ) => Effect.Effect<ApiResponse<Responses>, BoundaryError, HttpClient.HttpClient>
 
-  readonly POST: <
-    Path extends Extract<keyof Paths, string>,
-    Op = Paths[Path] extends { post: infer P } ? P : never,
-    Responses = ResponsesFor<Op>
-  >(
-    path: Path,
+  /**
+   * Execute POST request
+   */
+  readonly POST: <Responses>(
+    path: Extract<keyof Paths, string>,
     dispatcher: Dispatcher<Responses>,
     options?: RequestOptions
-  ) => ReturnType<typeof executeRequest<Responses>>
+  ) => Effect.Effect<ApiResponse<Responses>, BoundaryError, HttpClient.HttpClient>
 
-  readonly PUT: <
-    Path extends Extract<keyof Paths, string>,
-    Op = Paths[Path] extends { put: infer P } ? P : never,
-    Responses = ResponsesFor<Op>
-  >(
-    path: Path,
+  /**
+   * Execute PUT request
+   */
+  readonly PUT: <Responses>(
+    path: Extract<keyof Paths, string>,
     dispatcher: Dispatcher<Responses>,
     options?: RequestOptions
-  ) => ReturnType<typeof executeRequest<Responses>>
+  ) => Effect.Effect<ApiResponse<Responses>, BoundaryError, HttpClient.HttpClient>
 
-  readonly DELETE: <
-    Path extends Extract<keyof Paths, string>,
-    Op = Paths[Path] extends { delete: infer D } ? D : never,
-    Responses = ResponsesFor<Op>
-  >(
-    path: Path,
+  /**
+   * Execute DELETE request
+   */
+  readonly DELETE: <Responses>(
+    path: Extract<keyof Paths, string>,
     dispatcher: Dispatcher<Responses>,
     options?: RequestOptions
-  ) => ReturnType<typeof executeRequest<Responses>>
+  ) => Effect.Effect<ApiResponse<Responses>, BoundaryError, HttpClient.HttpClient>
 
-  readonly PATCH: <
-    Path extends Extract<keyof Paths, string>,
-    Op = Paths[Path] extends { patch: infer P } ? P : never,
-    Responses = ResponsesFor<Op>
-  >(
-    path: Path,
+  /**
+   * Execute PATCH request
+   */
+  readonly PATCH: <Responses>(
+    path: Extract<keyof Paths, string>,
     dispatcher: Dispatcher<Responses>,
     options?: RequestOptions
-  ) => ReturnType<typeof executeRequest<Responses>>
+  ) => Effect.Effect<ApiResponse<Responses>, BoundaryError, HttpClient.HttpClient>
 
-  readonly HEAD: <
-    Path extends Extract<keyof Paths, string>,
-    Op = Paths[Path] extends { head: infer H } ? H : never,
-    Responses = ResponsesFor<Op>
-  >(
-    path: Path,
+  /**
+   * Execute HEAD request
+   */
+  readonly HEAD: <Responses>(
+    path: Extract<keyof Paths, string>,
     dispatcher: Dispatcher<Responses>,
     options?: RequestOptions
-  ) => ReturnType<typeof executeRequest<Responses>>
+  ) => Effect.Effect<ApiResponse<Responses>, BoundaryError, HttpClient.HttpClient>
 
-  readonly OPTIONS: <
-    Path extends Extract<keyof Paths, string>,
-    Op = Paths[Path] extends { options: infer O } ? O : never,
-    Responses = ResponsesFor<Op>
-  >(
-    path: Path,
+  /**
+   * Execute OPTIONS request
+   */
+  readonly OPTIONS: <Responses>(
+    path: Extract<keyof Paths, string>,
     dispatcher: Dispatcher<Responses>,
     options?: RequestOptions
-  ) => ReturnType<typeof executeRequest<Responses>>
+  ) => Effect.Effect<ApiResponse<Responses>, BoundaryError, HttpClient.HttpClient>
 }
 
 /**
@@ -214,6 +218,9 @@ const createMethodHandler = (
 /**
  * Create type-safe Effect-based API client
  *
+ * The client automatically infers response types from the dispatcher parameter,
+ * eliminating the need for explicit type annotations on the result.
+ *
  * @typeParam Paths - OpenAPI paths type from openapi-typescript
  * @param options - Client configuration
  * @returns API client with typed methods for all operations
@@ -233,9 +240,11 @@ const createMethodHandler = (
  *   credentials: "include"
  * })
  *
- * const result = client.GET("/pets/{id}", dispatcherGetPet, {
+ * // Types are automatically inferred - no annotation needed!
+ * const result = yield* client.GET("/pets/{id}", dispatcherGetPet, {
  *   params: { id: "123" }
  * })
+ * // result is correctly typed as ApiSuccess<GetPetResponses>
  * ```
  */
 export const createClient = <Paths extends object>(

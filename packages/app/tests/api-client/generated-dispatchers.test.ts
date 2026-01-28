@@ -320,16 +320,14 @@ describe("Exhaustiveness (compile-time verification)", () => {
     // In real code, omitting a status case should cause compile error
 
     /*
-    const handleResponse = (response: ApiSuccess<listPetsOp> | ApiFailure<listPetsOp>) => {
-      if ('status' in response) {
-        switch (response.status) {
-          case 200:
-            return "success"
-          // case 500: // <-- Commenting this out should cause compile error
-          //   return "error"
-          default:
-            return assertNever(response) // <-- TypeScript error if not exhaustive
-        }
+    const handleResponse = (response: ApiResponse<listPetsOp>) => {
+      switch (response.status) {
+        case 200:
+          return "success"
+        // case 500: // <-- Commenting this out should cause compile error
+        //   return "error"
+        default:
+          return assertNever(response) // <-- TypeScript error if not exhaustive
       }
     }
     */
