@@ -1,26 +1,17 @@
-// CHANGE: Example script demonstrating createClient API usage with automatic type inference
-// WHY: Verify simplified API works as requested by reviewer without explicit type annotations
-// QUOTE(TZ): "А почему он заставляет явно описать тип? apiClient.GET и так должен вернуть тип"
-// REF: PR#3 comment from skulidropek
+// CHANGE: Example script demonstrating Effect-native error handling with createClient
+// WHY: Show how to handle HTTP errors (404, 500) via Effect error channel
+// QUOTE(TZ): "Мы не заставляем обрабатывать потенциальные исключения... Должно быть типо результат который принимается и потециальные исключения которые надо обработать"
+// REF: PR#3 comment from skulidropek about Effect representation
 // SOURCE: n/a
 // PURITY: SHELL
-// EFFECT: Demonstrates Effect-based API calls with automatic type inference
+// EFFECT: Demonstrates Effect-based API calls with forced error handling
 
 import * as FetchHttpClient from "@effect/platform/FetchHttpClient"
-import { Console, Effect, Exit } from "effect"
+import { Console, Effect, Exit, Match } from "effect"
 import { createClient, type ClientOptions } from "../src/shell/api-client/create-client.js"
 import { dispatchercreatePet, dispatchergetPet, dispatcherlistPets } from "../src/generated/dispatch.js"
 import type { Paths } from "../tests/fixtures/petstore.openapi.js"
-
-// Helper type for Error schema body
-type ErrorBody = { readonly code: number; readonly message: string }
-
-// Helper to check if body is an Error schema response
-const isErrorBody = (body: unknown): body is ErrorBody =>
-  typeof body === "object" &&
-  body !== null &&
-  "message" in body &&
-  typeof (body as ErrorBody).message === "string"
+// Types are automatically inferred - no need to import them explicitly
 
 /**
  * Example: Create API client with simplified API
@@ -36,10 +27,13 @@ const clientOptions: ClientOptions = {
 const apiClient = createClient<Paths>(clientOptions)
 
 /**
- * Example program: List all pets
+ * Example program: List all pets with Effect-native error handling
  *
- * NOTE: Types are now automatically inferred from the dispatcher!
- * No explicit type annotation needed on the result variable.
+ * NEW DESIGN:
+ * - Success channel (yield*): Only 2xx responses
+ * - Error channel (catchTag/catchAll): HTTP errors (500) + boundary errors
+ *
+ * This FORCES developers to handle HTTP errors explicitly!
  *
  * @pure false - performs HTTP request
  */
@@ -47,7 +41,7 @@ const listAllPetsExample = Effect.gen(function*() {
   yield* Console.log("=== Example 1: List all pets ===")
 
   // Execute request - type is automatically inferred from dispatcherlistPets
-  // No need for explicit type annotation!
+  // Now: success = 200 only, error = 500 | BoundaryError
   const result = yield* apiClient.GET(
     "/pets",
     dispatcherlistPets,
@@ -56,27 +50,36 @@ const listAllPetsExample = Effect.gen(function*() {
     }
   )
 
-  // Pattern match on the response - TypeScript knows the possible statuses
-  if (result.status === 200) {
-    const pets = result.body as Array<{ id: string; name: string; tag?: string }>
-    yield* Console.log(`Success: Got ${pets.length} pets`)
+  // Success! We only get here if status was 200
+  // No need to check status - TypeScript knows it's 200
+  const pets = result.body
+  yield* Console.log(`Success: Got ${pets.length} pets`)
+  if (pets.length > 0) {
     yield* Console.log(`  First pet: ${JSON.stringify(pets[0], null, 2)}`)
-  } else if (result.status === 500 && isErrorBody(result.body)) {
-    yield* Console.log(`Server error: ${result.body.message}`)
   }
-})
+}).pipe(
+  // HTTP errors (500) now require explicit handling!
+  Effect.catchTag("HttpError", (error) =>
+    Console.log(`Server error (500): ${JSON.stringify(error.body)}`)),
+  // Boundary errors are also in error channel
+  Effect.catchTag("TransportError", (error) =>
+    Console.log(`Transport error: ${error.error.message}`)),
+  Effect.catchTag("UnexpectedStatus", (error) =>
+    Console.log(`Unexpected status: ${error.status}`))
+)
 
 /**
  * Example program: Get specific pet
  *
- * Demonstrates path parameters with automatic type inference.
+ * Demonstrates handling multiple HTTP error statuses (404, 500).
  *
  * @pure false - performs HTTP request
  */
 const getPetExample = Effect.gen(function*() {
   yield* Console.log("\n=== Example 2: Get specific pet ===")
 
-  // Type is inferred from dispatchergetPet - no annotation needed!
+  // Type is inferred from dispatchergetPet
+  // Success = 200, Error = 404 | 500 | BoundaryError
   const result = yield* apiClient.GET(
     "/pets/{petId}",
     dispatchergetPet,
@@ -85,21 +88,25 @@ const getPetExample = Effect.gen(function*() {
     }
   )
 
-  if (result.status === 200) {
-    const pet = result.body as { id: string; name: string; tag?: string }
-    yield* Console.log(`Success: Got pet "${pet.name}"`)
-    yield* Console.log(`  Tag: ${pet.tag ?? "none"}`)
-  } else if (result.status === 404 && isErrorBody(result.body)) {
-    yield* Console.log(`Not found: ${result.body.message}`)
-  } else if (result.status === 500 && isErrorBody(result.body)) {
-    yield* Console.log(`Server error: ${result.body.message}`)
-  }
-})
+  // Success! Status is guaranteed to be 200
+  yield* Console.log(`Success: Got pet "${result.body.name}"`)
+  yield* Console.log(`  Tag: ${result.body.tag ?? "none"}`)
+}).pipe(
+  // Handle HTTP errors using Match for exhaustive pattern matching
+  Effect.catchTag("HttpError", (error) =>
+    Match.value(error.status).pipe(
+      Match.when(404, () => Console.log(`Not found: ${JSON.stringify(error.body)}`)),
+      Match.when(500, () => Console.log(`Server error: ${JSON.stringify(error.body)}`)),
+      Match.orElse(() => Console.log(`Unexpected HTTP error: ${error.status}`))
+    )),
+  Effect.catchTag("TransportError", (error) =>
+    Console.log(`Transport error: ${error.error.message}`))
+)
 
 /**
  * Example program: Create new pet
  *
- * Demonstrates POST requests with body.
+ * Demonstrates handling validation errors (400).
  *
  * @pure false - performs HTTP request
  */
@@ -111,7 +118,8 @@ const createPetExample = Effect.gen(function*() {
     tag: "cat"
   }
 
-  // Type is inferred from dispatchercreatePet - no annotation needed!
+  // Type is inferred from dispatchercreatePet
+  // Success = 201, Error = 400 | 500 | BoundaryError
   const result = yield* apiClient.POST(
     "/pets",
     dispatchercreatePet,
@@ -121,57 +129,54 @@ const createPetExample = Effect.gen(function*() {
     }
   )
 
-  if (result.status === 201) {
-    const pet = result.body as { id: string; name: string; tag?: string }
-    yield* Console.log(`Success: Created pet with ID ${pet.id}`)
-    yield* Console.log(`  Name: ${pet.name}`)
-  } else if (result.status === 400 && isErrorBody(result.body)) {
-    yield* Console.log(`Validation error: ${result.body.message}`)
-  } else if (result.status === 500 && isErrorBody(result.body)) {
-    yield* Console.log(`Server error: ${result.body.message}`)
-  }
-})
+  // Success! Status is guaranteed to be 201
+  yield* Console.log(`Success: Created pet with ID ${result.body.id}`)
+  yield* Console.log(`  Name: ${result.body.name}`)
+}).pipe(
+  // Handle HTTP errors - FORCED by TypeScript!
+  Effect.catchTag("HttpError", (error) =>
+    Match.value(error.status).pipe(
+      Match.when(400, () => Console.log(`Validation error: ${JSON.stringify(error.body)}`)),
+      Match.when(500, () => Console.log(`Server error: ${JSON.stringify(error.body)}`)),
+      Match.orElse(() => Console.log(`Unexpected HTTP error: ${error.status}`))
+    )),
+  Effect.catchTag("TransportError", (error) =>
+    Console.log(`Transport error: ${error.error.message}`))
+)
 
 /**
- * Example program: Handle transport error
+ * Example program: Using Effect.either for conditional error handling
  *
- * Demonstrates error handling with Effect.either.
+ * Demonstrates how to access both success and error in one place.
  *
  * @pure false - performs HTTP request
  */
-const errorHandlingExample = Effect.gen(function*() {
-  yield* Console.log("\n=== Example 4: Error handling ===")
-
-  // Create client with invalid URL to trigger transport error
-  const invalidClient = createClient<Paths>({
-    baseUrl: "http://invalid.localhost:99999",
-    credentials: "include"
-  })
+const eitherExample = Effect.gen(function*() {
+  yield* Console.log("\n=== Example 4: Using Effect.either ===")
 
   const result = yield* Effect.either(
-    invalidClient.GET("/pets", dispatcherlistPets)
+    apiClient.GET("/pets/{petId}", dispatchergetPet, {
+      params: { petId: "999" } // Non-existent pet
+    })
   )
 
-  if (result._tag === "Left") {
-    const error = result.left
-    if (error._tag === "TransportError") {
-      yield* Console.log(`Transport error caught: ${error.error.message}`)
-    } else if (error._tag === "UnexpectedStatus") {
-      yield* Console.log(`Unexpected status: ${error.status}`)
-    } else if (error._tag === "ParseError") {
-      yield* Console.log(`Parse error: ${error.error.message}`)
-    } else {
-      yield* Console.log(`Other error: ${error._tag}`)
-    }
+  if (result._tag === "Right") {
+    // Success - got the pet
+    yield* Console.log(`Found pet: ${result.right.body.name}`)
   } else {
-    yield* Console.log("Expected error but got success")
+    // Error - check the type
+    const error = result.left
+    if ("_tag" in error) {
+      if (error._tag === "HttpError") {
+        // HTTP error from schema (404 or 500)
+        yield* Console.log(`HTTP error ${error.status}: ${JSON.stringify(error.body)}`)
+      } else {
+        // Boundary error (TransportError, UnexpectedStatus, etc.)
+        yield* Console.log(`Boundary error: ${error._tag}`)
+      }
+    }
   }
 })
-
-/**
- * Helper type for ApiFailure errors
- */
-type ApiError = { readonly _tag: string }
 
 /**
  * Main program - runs all examples
@@ -181,38 +186,51 @@ type ApiError = { readonly _tag: string }
 const mainProgram = Effect.gen(function*() {
   yield* Console.log("========================================")
   yield* Console.log("  OpenAPI Effect Client - Examples")
+  yield* Console.log("  Effect-Native Error Handling")
   yield* Console.log("========================================\n")
 
-  yield* Console.log("Demonstrating simplified API with automatic type inference:")
-  yield* Console.log('  import createClient from "openapi-effect"')
-  yield* Console.log("  const client = createClient<Paths>({ ... })")
-  yield* Console.log("  const result = yield* client.GET(\"/path\", dispatcher)")
-  yield* Console.log("  // result is automatically typed!\n")
+  yield* Console.log("NEW DESIGN:")
+  yield* Console.log("  - Success channel: 2xx responses only")
+  yield* Console.log("  - Error channel: HTTP errors (4xx, 5xx) + boundary errors")
+  yield* Console.log("  - Developers MUST handle HTTP errors explicitly!\n")
+
+  yield* Console.log("Example code:")
+  yield* Console.log('  const result = yield* client.GET("/path", dispatcher)')
+  yield* Console.log("  // result is 200 - no need to check status!")
+  yield* Console.log("").pipe(Effect.flatMap(() =>
+    Console.log("  // HTTP errors handled via Effect.catchTag or Effect.match\n")
+  ))
 
   // Note: These examples will fail with transport errors since
   // we're not connecting to a real server. This is intentional
   // to demonstrate error handling.
 
-  yield* Effect.catchAll(listAllPetsExample, (error: ApiError) =>
-    Console.log(`Transport error (expected): ${error._tag === "TransportError" ? "Cannot connect to example server" : error._tag}`)
+  yield* listAllPetsExample.pipe(
+    Effect.catchAll((error) =>
+      Console.log(`Unhandled error in listAllPets: ${JSON.stringify(error)}`))
   )
 
-  yield* Effect.catchAll(getPetExample, (error: ApiError) =>
-    Console.log(`Transport error (expected): ${error._tag === "TransportError" ? "Cannot connect to example server" : error._tag}`)
+  yield* getPetExample.pipe(
+    Effect.catchAll((error) =>
+      Console.log(`Unhandled error in getPet: ${JSON.stringify(error)}`))
   )
 
-  yield* Effect.catchAll(createPetExample, (error: ApiError) =>
-    Console.log(`Transport error (expected): ${error._tag === "TransportError" ? "Cannot connect to example server" : error._tag}`)
+  yield* createPetExample.pipe(
+    Effect.catchAll((error) =>
+      Console.log(`Unhandled error in createPet: ${JSON.stringify(error)}`))
   )
 
-  yield* errorHandlingExample
+  yield* eitherExample.pipe(
+    Effect.catchAll((error) =>
+      Console.log(`Unhandled error in either example: ${JSON.stringify(error)}`))
+  )
 
   yield* Console.log("\nAll examples completed!")
-  yield* Console.log("\nType safety verification:")
-  yield* Console.log("  - Response types automatically inferred from dispatcher")
-  yield* Console.log("  - No explicit type annotations required")
-  yield* Console.log("  - All paths type-checked against OpenAPI schema")
-  yield* Console.log("  - All errors explicit in Effect type")
+  yield* Console.log("\nKey benefits of Effect-native error handling:")
+  yield* Console.log("  - HTTP errors (404, 500) FORCE explicit handling")
+  yield* Console.log("  - No accidental ignoring of error responses")
+  yield* Console.log("  - Type-safe discrimination via _tag and status")
+  yield* Console.log("  - Exhaustive pattern matching with Match.exhaustive")
 })
 
 /**

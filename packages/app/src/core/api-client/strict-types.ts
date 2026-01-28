@@ -78,7 +78,8 @@ export type BodyFor<
   : never
 
 /**
- * Build a correlated response variant (status + contentType + body)
+ * Build a correlated success response variant (status + contentType + body)
+ * Used for 2xx responses that go to the success channel.
  *
  * @pure true - compile-time only
  * @invariant ∀ variant: variant.body = BodyFor<Responses, variant.status, variant.contentType>
@@ -88,6 +89,26 @@ export type ResponseVariant<
   Status extends StatusCodes<Responses>,
   ContentType extends ContentTypesFor<Responses, Status>
 > = {
+  readonly status: Status
+  readonly contentType: ContentType
+  readonly body: BodyFor<Responses, Status, ContentType>
+}
+
+/**
+ * Build a correlated HTTP error response variant (status + contentType + body + _tag)
+ * Used for non-2xx responses (4xx, 5xx) that go to the error channel.
+ *
+ * The `_tag: "HttpError"` discriminator allows distinguishing HTTP errors from BoundaryErrors.
+ *
+ * @pure true - compile-time only
+ * @invariant ∀ variant: variant.body = BodyFor<Responses, variant.status, variant.contentType>
+ */
+export type HttpErrorResponseVariant<
+  Responses,
+  Status extends StatusCodes<Responses>,
+  ContentType extends ContentTypesFor<Responses, Status>
+> = {
+  readonly _tag: "HttpError"
   readonly status: Status
   readonly contentType: ContentType
   readonly body: BodyFor<Responses, Status, ContentType>
@@ -122,14 +143,15 @@ export type SuccessVariants<Responses> = AllResponseVariants<Responses> extends 
 
 /**
  * Filter response variants to error statuses (non-2xx from schema)
+ * Returns HttpErrorResponseVariant with `_tag: "HttpError"` for discrimination.
  *
  * @pure true - compile-time only
- * @invariant ∀ v ∈ HttpErrorVariants: v.status ∉ [200..299] ∧ v.status ∈ Schema
+ * @invariant ∀ v ∈ HttpErrorVariants: v.status ∉ [200..299] ∧ v.status ∈ Schema ∧ v._tag = "HttpError"
  */
 export type HttpErrorVariants<Responses> = AllResponseVariants<Responses> extends infer V
   ? V extends ResponseVariant<Responses, infer S, infer CT>
     ? S extends 200 | 201 | 202 | 203 | 204 | 205 | 206 | 207 | 208 | 226 ? never
-    : ResponseVariant<Responses, S, CT>
+    : HttpErrorResponseVariant<Responses, S, CT>
   : never
   : never
 
@@ -182,19 +204,50 @@ export type BoundaryError =
   | DecodeError
 
 /**
- * All response variants from schema (both success and error statuses)
- *
- * @pure true - compile-time only
- * @invariant Result = SuccessVariants ⊎ HttpErrorVariants (all schema responses)
- */
-export type ApiResponse<Responses> = SuccessVariants<Responses> | HttpErrorVariants<Responses>
-
-/**
  * Success type for an operation (2xx statuses only)
  *
+ * Goes to the **success channel** of Effect.
+ * Developers receive this directly without needing to handle errors.
+ *
  * @pure true - compile-time only
+ * @invariant ∀ v ∈ ApiSuccess: v.status ∈ [200..299]
  */
 export type ApiSuccess<Responses> = SuccessVariants<Responses>
+
+/**
+ * HTTP error responses from schema (non-2xx statuses like 400, 404, 500)
+ *
+ * Goes to the **error channel** of Effect, forcing explicit handling.
+ * These are business-level errors defined in the OpenAPI schema.
+ *
+ * @pure true - compile-time only
+ * @invariant ∀ v ∈ HttpError: v.status ∉ [200..299] ∧ v.status ∈ Schema
+ */
+export type HttpError<Responses> = HttpErrorVariants<Responses>
+
+/**
+ * Complete failure type for API operations
+ *
+ * Includes both schema-defined HTTP errors (4xx, 5xx) and boundary errors.
+ * All failures go to the **error channel** of Effect, forcing explicit handling.
+ *
+ * @pure true - compile-time only
+ * @invariant ApiFailure = HttpError ⊎ BoundaryError
+ *
+ * BREAKING CHANGE: Previously, HTTP errors (404, 500) were in success channel.
+ * Now they are in error channel, requiring explicit handling with Effect.catchTag
+ * or Effect.match pattern.
+ */
+export type ApiFailure<Responses> = HttpError<Responses> | BoundaryError
+
+/**
+ * @deprecated Use ApiSuccess<Responses> for success channel
+ * and ApiFailure<Responses> for error channel instead.
+ *
+ * ApiResponse mixed success and error statuses in one type.
+ * New API separates them into proper Effect channels.
+ */
+export type ApiResponse<Responses> = SuccessVariants<Responses> | HttpErrorVariants<Responses>
 
 /**
  * Helper to ensure exhaustive pattern matching

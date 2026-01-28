@@ -1,12 +1,12 @@
-// CHANGE: Tests for generated dispatchers with petstore schema
-// WHY: Verify dispatcher exhaustiveness and correct status/content-type handling
+// CHANGE: Tests for generated dispatchers with Effect-native error handling
+// WHY: Verify 2xx → success channel, non-2xx → error channel (forced handling)
 // QUOTE(ТЗ): "TypeScript должен выдавать ошибку 'неполное покрытие' через паттерн assertNever"
-// REF: issue-2, section A3
+// REF: issue-2, section A3, 4.2
 // SOURCE: n/a
-// FORMAT THEOREM: ∀ op ∈ GeneratedOps: test(op) verifies exhaustive coverage
+// FORMAT THEOREM: ∀ op ∈ GeneratedOps: success(2xx) | httpError(non-2xx) | boundaryError
 // PURITY: SHELL
 // EFFECT: Effect<void, never, never>
-// INVARIANT: All schema statuses handled, unexpected cases return boundary errors
+// INVARIANT: 2xx → isRight (success), non-2xx → isLeft (HttpError), unexpected → isLeft (BoundaryError)
 // COMPLEXITY: O(1) per test
 
 import * as HttpClient from "@effect/platform/HttpClient"
@@ -81,7 +81,7 @@ describe("Generated dispatcher: listPets", () => {
       }
     }).pipe(Effect.runPromise))
 
-  it("should handle 500 error response", () =>
+  it("should return HttpError for 500 response (error channel)", () =>
     Effect.gen(function*() {
       const errorBody = JSON.stringify({ code: 500, message: "Internal server error" })
 
@@ -98,11 +98,14 @@ describe("Generated dispatcher: listPets", () => {
         )
       )
 
-      // 500 is in schema, so it's a typed error (not BoundaryError)
-      expect(Either.isRight(result)).toBe(true)
-      if (Either.isRight(result)) {
-        expect(result.right.status).toBe(500)
-        expect(result.right.contentType).toBe("application/json")
+      // 500 is in schema → HttpError in error channel (forces explicit handling)
+      expect(Either.isLeft(result)).toBe(true)
+      if (Either.isLeft(result)) {
+        expect(result.left).toMatchObject({
+          _tag: "HttpError",
+          status: 500,
+          contentType: "application/json"
+        })
       }
     }).pipe(Effect.runPromise))
 
@@ -161,7 +164,7 @@ describe("Generated dispatcher: createPet", () => {
       }
     }).pipe(Effect.runPromise))
 
-  it("should handle 400 validation error", () =>
+  it("should return HttpError for 400 validation error (error channel)", () =>
     Effect.gen(function*() {
       const errorBody = JSON.stringify({ code: 400, message: "Validation failed" })
 
@@ -179,13 +182,17 @@ describe("Generated dispatcher: createPet", () => {
         )
       )
 
-      expect(Either.isRight(result)).toBe(true)
-      if (Either.isRight(result)) {
-        expect(result.right.status).toBe(400)
+      // 400 is in schema → HttpError in error channel (forces explicit handling)
+      expect(Either.isLeft(result)).toBe(true)
+      if (Either.isLeft(result)) {
+        expect(result.left).toMatchObject({
+          _tag: "HttpError",
+          status: 400
+        })
       }
     }).pipe(Effect.runPromise))
 
-  it("should handle 500 error", () =>
+  it("should return HttpError for 500 error (error channel)", () =>
     Effect.gen(function*() {
       const errorBody = JSON.stringify({ code: 500, message: "Server error" })
 
@@ -203,9 +210,13 @@ describe("Generated dispatcher: createPet", () => {
         )
       )
 
-      expect(Either.isRight(result)).toBe(true)
-      if (Either.isRight(result)) {
-        expect(result.right.status).toBe(500)
+      // 500 is in schema → HttpError in error channel (forces explicit handling)
+      expect(Either.isLeft(result)).toBe(true)
+      if (Either.isLeft(result)) {
+        expect(result.left).toMatchObject({
+          _tag: "HttpError",
+          status: 500
+        })
       }
     }).pipe(Effect.runPromise))
 })
@@ -235,7 +246,7 @@ describe("Generated dispatcher: getPet", () => {
       }
     }).pipe(Effect.runPromise))
 
-  it("should handle 404 not found", () =>
+  it("should return HttpError for 404 not found (error channel)", () =>
     Effect.gen(function*() {
       const errorBody = JSON.stringify({ code: 404, message: "Pet not found" })
 
@@ -253,9 +264,13 @@ describe("Generated dispatcher: getPet", () => {
         )
       )
 
-      expect(Either.isRight(result)).toBe(true)
-      if (Either.isRight(result)) {
-        expect(result.right.status).toBe(404)
+      // 404 is in schema → HttpError in error channel (forces explicit handling)
+      expect(Either.isLeft(result)).toBe(true)
+      if (Either.isLeft(result)) {
+        expect(result.left).toMatchObject({
+          _tag: "HttpError",
+          status: 404
+        })
       }
     }).pipe(Effect.runPromise))
 })
@@ -285,7 +300,7 @@ describe("Generated dispatcher: deletePet", () => {
       }
     }).pipe(Effect.runPromise))
 
-  it("should handle 404 pet not found", () =>
+  it("should return HttpError for 404 pet not found (error channel)", () =>
     Effect.gen(function*() {
       const errorBody = JSON.stringify({ code: 404, message: "Pet not found" })
 
@@ -303,9 +318,13 @@ describe("Generated dispatcher: deletePet", () => {
         )
       )
 
-      expect(Either.isRight(result)).toBe(true)
-      if (Either.isRight(result)) {
-        expect(result.right.status).toBe(404)
+      // 404 is in schema → HttpError in error channel (forces explicit handling)
+      expect(Either.isLeft(result)).toBe(true)
+      if (Either.isLeft(result)) {
+        expect(result.left).toMatchObject({
+          _tag: "HttpError",
+          status: 404
+        })
       }
     }).pipe(Effect.runPromise))
 })

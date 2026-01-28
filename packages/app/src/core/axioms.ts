@@ -26,7 +26,7 @@
  * @pure true
  */
 import type { Effect } from "effect"
-import type { ApiResponse, BoundaryError, TransportError } from "./api-client/strict-types.js"
+import type { ApiFailure, ApiSuccess, TransportError } from "./api-client/strict-types.js"
 
 export type Json =
   | null
@@ -75,18 +75,22 @@ export const asRawResponse = (value: {
 /**
  * Dispatcher classifies response and applies decoder
  *
- * Returns all schema-defined responses (both 2xx and non-2xx) in success channel.
- * Only boundary errors (parse, decode, unexpected status/content-type) go to error channel.
+ * NEW DESIGN (Effect-native):
+ * - Success channel: `ApiSuccess<Responses>` (2xx responses only)
+ * - Error channel: `ApiFailure<Responses>` (non-2xx schema errors + boundary errors)
+ *
+ * This forces developers to explicitly handle HTTP errors (404, 500, etc.)
+ * using Effect.catchTag, Effect.match, or similar patterns.
  *
  * @pure false - applies decoders
- * @effect Effect<ApiResponse, BoundaryError, never>
+ * @effect Effect<ApiSuccess, HttpError | BoundaryError, never>
  * @invariant Must handle all statuses and content-types from schema
  */
 export type Dispatcher<Responses> = (
   response: RawResponse
 ) => Effect.Effect<
-  ApiResponse<Responses>,
-  Exclude<BoundaryError, TransportError>
+  ApiSuccess<Responses>,
+  Exclude<ApiFailure<Responses>, TransportError>
 >
 
 export const asDispatcher = <Responses>(

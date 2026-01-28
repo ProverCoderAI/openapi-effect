@@ -12,7 +12,7 @@ import type * as HttpClient from "@effect/platform/HttpClient"
 import type { Effect } from "effect"
 import type { HttpMethod } from "openapi-typescript-helpers"
 
-import type { ApiResponse, BoundaryError } from "../../core/api-client/strict-types.js"
+import type { ApiFailure, ApiSuccess } from "../../core/api-client/strict-types.js"
 import { asStrictRequestInit, type Dispatcher } from "../../core/axioms.js"
 import type { StrictRequestInit } from "./strict-client.js"
 import { executeRequest } from "./strict-client.js"
@@ -43,15 +43,24 @@ export type RequestOptions = {
 }
 
 /**
- * Type-safe API client with Effect-based operations
+ * Type-safe API client with Effect-native error handling
  *
  * The Responses type is inferred from the Dispatcher parameter, which allows
  * TypeScript to automatically determine success/failure types without explicit annotations.
  *
+ * **Effect Channel Design:**
+ * - Success channel: `ApiSuccess<Responses>` - 2xx responses only
+ * - Error channel: `ApiFailure<Responses>` - HTTP errors (4xx, 5xx) + boundary errors
+ *
+ * This forces developers to explicitly handle HTTP errors using:
+ * - `Effect.catchTag` for specific error types (e.g., 404, 500)
+ * - `Effect.match` for exhaustive handling
+ * - `Effect.catchAll` for generic error handling
+ *
  * @typeParam Paths - OpenAPI paths type from openapi-typescript
  *
  * @pure false - operations perform HTTP requests
- * @effect All methods return Effect<ApiSuccess<Responses>, BoundaryError, HttpClient>
+ * @effect All methods return Effect<ApiSuccess<Responses>, ApiFailure<Responses>, HttpClient>
  */
 export type StrictApiClient<Paths extends object> = {
   /**
@@ -61,13 +70,13 @@ export type StrictApiClient<Paths extends object> = {
    * @param path - API path
    * @param dispatcher - Response dispatcher (provides type inference)
    * @param options - Optional request options
-   * @returns Effect with typed response (discriminate on status) and boundary errors
+   * @returns Effect with 2xx in success channel, errors in error channel
    */
   readonly GET: <Responses>(
     path: Extract<keyof Paths, string>,
     dispatcher: Dispatcher<Responses>,
     options?: RequestOptions
-  ) => Effect.Effect<ApiResponse<Responses>, BoundaryError, HttpClient.HttpClient>
+  ) => Effect.Effect<ApiSuccess<Responses>, ApiFailure<Responses>, HttpClient.HttpClient>
 
   /**
    * Execute POST request
@@ -76,7 +85,7 @@ export type StrictApiClient<Paths extends object> = {
     path: Extract<keyof Paths, string>,
     dispatcher: Dispatcher<Responses>,
     options?: RequestOptions
-  ) => Effect.Effect<ApiResponse<Responses>, BoundaryError, HttpClient.HttpClient>
+  ) => Effect.Effect<ApiSuccess<Responses>, ApiFailure<Responses>, HttpClient.HttpClient>
 
   /**
    * Execute PUT request
@@ -85,7 +94,7 @@ export type StrictApiClient<Paths extends object> = {
     path: Extract<keyof Paths, string>,
     dispatcher: Dispatcher<Responses>,
     options?: RequestOptions
-  ) => Effect.Effect<ApiResponse<Responses>, BoundaryError, HttpClient.HttpClient>
+  ) => Effect.Effect<ApiSuccess<Responses>, ApiFailure<Responses>, HttpClient.HttpClient>
 
   /**
    * Execute DELETE request
@@ -94,7 +103,7 @@ export type StrictApiClient<Paths extends object> = {
     path: Extract<keyof Paths, string>,
     dispatcher: Dispatcher<Responses>,
     options?: RequestOptions
-  ) => Effect.Effect<ApiResponse<Responses>, BoundaryError, HttpClient.HttpClient>
+  ) => Effect.Effect<ApiSuccess<Responses>, ApiFailure<Responses>, HttpClient.HttpClient>
 
   /**
    * Execute PATCH request
@@ -103,7 +112,7 @@ export type StrictApiClient<Paths extends object> = {
     path: Extract<keyof Paths, string>,
     dispatcher: Dispatcher<Responses>,
     options?: RequestOptions
-  ) => Effect.Effect<ApiResponse<Responses>, BoundaryError, HttpClient.HttpClient>
+  ) => Effect.Effect<ApiSuccess<Responses>, ApiFailure<Responses>, HttpClient.HttpClient>
 
   /**
    * Execute HEAD request
@@ -112,7 +121,7 @@ export type StrictApiClient<Paths extends object> = {
     path: Extract<keyof Paths, string>,
     dispatcher: Dispatcher<Responses>,
     options?: RequestOptions
-  ) => Effect.Effect<ApiResponse<Responses>, BoundaryError, HttpClient.HttpClient>
+  ) => Effect.Effect<ApiSuccess<Responses>, ApiFailure<Responses>, HttpClient.HttpClient>
 
   /**
    * Execute OPTIONS request
@@ -121,7 +130,7 @@ export type StrictApiClient<Paths extends object> = {
     path: Extract<keyof Paths, string>,
     dispatcher: Dispatcher<Responses>,
     options?: RequestOptions
-  ) => Effect.Effect<ApiResponse<Responses>, BoundaryError, HttpClient.HttpClient>
+  ) => Effect.Effect<ApiSuccess<Responses>, ApiFailure<Responses>, HttpClient.HttpClient>
 }
 
 /**
