@@ -91,8 +91,8 @@ export const createPetStrictProgram: Effect.Effect<void, never, HttpClient.HttpC
     "/pets",
     dispatchercreatePet,
     {
-      body: JSON.stringify({ name: "Fluffy", tag: "cat" }),
-      headers: { "Content-Type": "application/json" }
+      // Body can be typed object - client will auto-stringify and set Content-Type
+      body: { name: "Fluffy", tag: "cat" }
     }
   )
 

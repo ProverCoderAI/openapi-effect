@@ -40,6 +40,84 @@ export type OperationFor<
  */
 export type ResponsesFor<Op> = Op extends { responses: infer R } ? R : never
 
+// ============================================================================
+// Request-side typing (path/method → params/query/body)
+// ============================================================================
+
+/**
+ * Extract path parameters from operation
+ *
+ * @pure true - compile-time only
+ * @invariant Returns path params type or undefined if none
+ */
+export type PathParamsFor<Op> = Op extends { parameters: { path: infer P } }
+  ? P extends Record<string, infer V> ? Record<string, V>
+  : never
+  : undefined
+
+/**
+ * Extract query parameters from operation
+ *
+ * @pure true - compile-time only
+ * @invariant Returns query params type or undefined if none
+ */
+export type QueryParamsFor<Op> = Op extends { parameters: { query?: infer Q } } ? Q
+  : undefined
+
+/**
+ * Extract request body type from operation
+ *
+ * @pure true - compile-time only
+ * @invariant Returns body type or undefined if no requestBody
+ */
+export type RequestBodyFor<Op> = Op extends { requestBody: { content: infer C } }
+  ? C extends { "application/json": infer J } ? J
+  : C extends { [key: string]: infer V } ? V
+  : never
+  : undefined
+
+/**
+ * Check if path params are required
+ *
+ * @pure true - compile-time only
+ */
+
+export type HasRequiredPathParams<Op> = Op extends { parameters: { path: infer P } }
+  ? P extends Record<PropertyKey, string | number | boolean> ? keyof P extends never ? false : true
+  : false
+  : false
+
+/**
+ * Check if request body is required
+ *
+ * @pure true - compile-time only
+ */
+export type HasRequiredBody<Op> = Op extends { requestBody: infer RB } ? RB extends { content: object } ? true
+  : false
+  : false
+
+/**
+ * Build request options type from operation with all constraints
+ * - params: required if path has required parameters
+ * - query: optional, typed from operation
+ * - body: required if operation has requestBody (accepts typed object OR string)
+ *
+ * For request body:
+ * - Users can pass either the typed object (preferred, for type safety)
+ * - Or a pre-stringified JSON string with headers (for backwards compatibility)
+ *
+ * @pure true - compile-time only
+ * @invariant Options type is fully derived from operation definition
+ */
+export type RequestOptionsFor<Op> =
+  & (HasRequiredPathParams<Op> extends true ? { readonly params: PathParamsFor<Op> }
+    : { readonly params?: PathParamsFor<Op> })
+  & (HasRequiredBody<Op> extends true ? { readonly body: RequestBodyFor<Op> | BodyInit }
+    : { readonly body?: RequestBodyFor<Op> | BodyInit })
+  & { readonly query?: QueryParamsFor<Op> }
+  & { readonly headers?: HeadersInit }
+  & { readonly signal?: AbortSignal }
+
 /**
  * Extract status codes from responses
  *
@@ -129,14 +207,25 @@ type AllResponseVariants<Responses> = StatusCodes<Responses> extends infer Statu
   : never
 
 /**
- * Filter response variants to success statuses (2xx)
+ * Generic 2xx status detection without hardcoding
+ * Uses template literal type to check if status string starts with "2"
+ *
+ * Works with any 2xx status including non-standard ones like 250.
  *
  * @pure true - compile-time only
- * @invariant ∀ v ∈ SuccessVariants: v.status ∈ [200..299]
+ * @invariant Is2xx<S> = true ⟺ 200 ≤ S < 300
+ */
+export type Is2xx<S extends string | number> = `${S}` extends `2${string}` ? true : false
+
+/**
+ * Filter response variants to success statuses (2xx)
+ * Uses generic Is2xx instead of hardcoded status list.
+ *
+ * @pure true - compile-time only
+ * @invariant ∀ v ∈ SuccessVariants: Is2xx<v.status> = true
  */
 export type SuccessVariants<Responses> = AllResponseVariants<Responses> extends infer V
-  ? V extends ResponseVariant<Responses, infer S, infer CT>
-    ? S extends 200 | 201 | 202 | 203 | 204 | 205 | 206 | 207 | 208 | 226 ? ResponseVariant<Responses, S, CT>
+  ? V extends ResponseVariant<Responses, infer S, infer CT> ? Is2xx<S> extends true ? ResponseVariant<Responses, S, CT>
     : never
   : never
   : never
@@ -144,13 +233,13 @@ export type SuccessVariants<Responses> = AllResponseVariants<Responses> extends 
 /**
  * Filter response variants to error statuses (non-2xx from schema)
  * Returns HttpErrorResponseVariant with `_tag: "HttpError"` for discrimination.
+ * Uses generic Is2xx instead of hardcoded status list.
  *
  * @pure true - compile-time only
- * @invariant ∀ v ∈ HttpErrorVariants: v.status ∉ [200..299] ∧ v.status ∈ Schema ∧ v._tag = "HttpError"
+ * @invariant ∀ v ∈ HttpErrorVariants: Is2xx<v.status> = false ∧ v.status ∈ Schema ∧ v._tag = "HttpError"
  */
 export type HttpErrorVariants<Responses> = AllResponseVariants<Responses> extends infer V
-  ? V extends ResponseVariant<Responses, infer S, infer CT>
-    ? S extends 200 | 201 | 202 | 203 | 204 | 205 | 206 | 207 | 208 | 226 ? never
+  ? V extends ResponseVariant<Responses, infer S, infer CT> ? Is2xx<S> extends true ? never
     : HttpErrorResponseVariant<Responses, S, CT>
   : never
   : never

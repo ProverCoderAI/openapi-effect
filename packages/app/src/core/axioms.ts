@@ -104,3 +104,32 @@ export const asDispatcher = <Responses>(
  * @pure true
  */
 export const asStrictRequestInit = <T>(config: object): T => config as T
+
+/**
+ * Classifier function type for dispatcher creation
+ * AXIOM: Classify function returns Effect with heterogeneous union types
+ *
+ * This type uses `unknown` to allow the classify function to return
+ * heterogeneous Effect unions from switch statements. The actual types
+ * are enforced by the generated dispatcher code.
+ *
+ * @pure true
+ */
+export type ClassifyFn = (
+  status: number,
+  contentType: string | undefined,
+  text: string
+) => Effect.Effect<unknown, unknown>
+
+/**
+ * Cast internal client implementation to typed StrictApiClient
+ * AXIOM: Client implementation correctly implements all method constraints
+ *
+ * This cast is safe because:
+ * 1. StrictApiClient type enforces path/method constraints at call sites
+ * 2. The runtime implementation correctly builds requests for any path/method
+ * 3. Type checking happens at the call site, not in the implementation
+ *
+ * @pure true
+ */
+export const asStrictApiClient = <T>(client: object): T => client as T

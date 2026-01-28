@@ -31,6 +31,7 @@ import {
   asJson,
   asRawResponse,
   asStrictRequestInit,
+  type ClassifyFn,
   type Dispatcher,
   type Json,
   type RawResponse
@@ -201,11 +202,7 @@ const toNativeHeaders = (platformHeaders: { readonly [key: string]: string }): H
  */
 
 export const createDispatcher = <Responses>(
-  classify: (
-    status: number,
-    contentType: string | undefined,
-    text: string
-  ) => Effect.Effect<unknown, unknown>
+  classify: ClassifyFn
 ): Dispatcher<Responses> => {
   return asDispatcher<Responses>((response: RawResponse) => {
     const contentType = response.headers.get("content-type") ?? undefined

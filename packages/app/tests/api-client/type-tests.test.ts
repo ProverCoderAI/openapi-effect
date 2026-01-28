@@ -1,25 +1,28 @@
-// CHANGE: Type-level tests proving literal union preservation for status codes
-// WHY: Verify status types don't degrade to 'number' - requirement from blocking review
+// CHANGE: Type-level tests proving literal union preservation and request-side constraints
+// WHY: Verify types enforce all invariants - requirement from blocking review
 // QUOTE(ТЗ): "expectTypeOf<A["status"]>().toEqualTypeOf<200>()" and "@ts-expect-error" tests
-// REF: PR#3 blocking review sections 3.1, 3.2
+// REF: PR#3 blocking review sections 3.1, 3.2, 4.2
 // SOURCE: n/a
 // PURITY: CORE - compile-time tests only
 // EFFECT: none - type assertions at compile time
-// INVARIANT: status is literal union, not number
+// INVARIANT: status is literal union, not number; path/method constraints enforced
 
 import { describe, expectTypeOf, it } from "vitest"
 
 import type {
   ApiFailure,
   ApiSuccess,
+  DecodeError,
   HttpError,
-  TransportError,
-  UnexpectedStatus,
-  UnexpectedContentType,
+  Is2xx,
   ParseError,
-  DecodeError
+  PathsForMethod,
+  TransportError,
+  UnexpectedContentType,
+  UnexpectedStatus
 } from "../../src/core/api-client/strict-types.js"
-import type { Operations } from "../fixtures/petstore.openapi.js"
+import type { CustomOperations } from "../fixtures/custom-2xx.openapi.js"
+import type { Operations, Paths } from "../fixtures/petstore.openapi.js"
 
 // Response types for each operation
 type ListPetsResponses = Operations["listPets"]["responses"]
@@ -89,40 +92,37 @@ describe("3.1: HttpError has _tag discriminator", () => {
 })
 
 // =============================================================================
-// SECTION 3.2: Negative @ts-expect-error tests (from review)
+// SECTION 3.2: Negative tests - success status cannot be error status
+// Using expectTypeOf().not.toExtend() instead of @ts-expect-error
 // =============================================================================
 
 describe("3.2: Negative tests - success status cannot be error status", () => {
   it("success status cannot be 404", () => {
     type Success = ApiSuccess<GetPetResponses>
 
-    // @ts-expect-error - 404 is not a valid success status for getPet
-    const _bad404: 404 = null as unknown as Success["status"]
-    void _bad404
+    // 404 is not a valid success status for getPet
+    expectTypeOf<404>().not.toExtend<Success["status"]>()
   })
 
   it("success status cannot be 500", () => {
     type Success = ApiSuccess<GetPetResponses>
 
-    // @ts-expect-error - 500 is not a valid success status
-    const _bad500: 500 = null as unknown as Success["status"]
-    void _bad500
+    // 500 is not a valid success status
+    expectTypeOf<500>().not.toExtend<Success["status"]>()
   })
 
   it("success status cannot be 400", () => {
     type Success = ApiSuccess<CreatePetResponses>
 
-    // @ts-expect-error - 400 is not a valid success status for createPet
-    const _bad400: 400 = null as unknown as Success["status"]
-    void _bad400
+    // 400 is not a valid success status for createPet
+    expectTypeOf<400>().not.toExtend<Success["status"]>()
   })
 
   it("listPets success status cannot be 500", () => {
     type Success = ApiSuccess<ListPetsResponses>
 
-    // @ts-expect-error - 500 is not a valid success status for listPets
-    const _bad: 500 = null as unknown as Success["status"]
-    void _bad
+    // 500 is not a valid success status for listPets
+    expectTypeOf<500>().not.toExtend<Success["status"]>()
   })
 })
 
@@ -130,17 +130,15 @@ describe("3.2: Negative tests - error status cannot be success status", () => {
   it("HttpError status cannot be 200 for getPet", () => {
     type ErrorType = HttpError<GetPetResponses>
 
-    // @ts-expect-error - 200 is not in HttpError for getPet
-    const _bad200: 200 = null as unknown as ErrorType["status"]
-    void _bad200
+    // 200 is not in HttpError for getPet
+    expectTypeOf<200>().not.toExtend<ErrorType["status"]>()
   })
 
   it("HttpError status cannot be 201 for createPet", () => {
     type ErrorType = HttpError<CreatePetResponses>
 
-    // @ts-expect-error - 201 is not in HttpError for createPet
-    const _bad201: 201 = null as unknown as ErrorType["status"]
-    void _bad201
+    // 201 is not in HttpError for createPet
+    expectTypeOf<201>().not.toExtend<ErrorType["status"]>()
   })
 })
 
@@ -153,14 +151,14 @@ describe("ApiFailure type structure", () => {
     type Failure = ApiFailure<GetPetResponses>
 
     // Should include HttpError
-    expectTypeOf<HttpError<GetPetResponses>>().toMatchTypeOf<Failure>()
+    expectTypeOf<HttpError<GetPetResponses>>().toExtend<Failure>()
 
     // Should include all BoundaryError variants
-    expectTypeOf<TransportError>().toMatchTypeOf<Failure>()
-    expectTypeOf<UnexpectedStatus>().toMatchTypeOf<Failure>()
-    expectTypeOf<UnexpectedContentType>().toMatchTypeOf<Failure>()
-    expectTypeOf<ParseError>().toMatchTypeOf<Failure>()
-    expectTypeOf<DecodeError>().toMatchTypeOf<Failure>()
+    expectTypeOf<TransportError>().toExtend<Failure>()
+    expectTypeOf<UnexpectedStatus>().toExtend<Failure>()
+    expectTypeOf<UnexpectedContentType>().toExtend<Failure>()
+    expectTypeOf<ParseError>().toExtend<Failure>()
+    expectTypeOf<DecodeError>().toExtend<Failure>()
   })
 
   it("BoundaryError has all required _tag discriminators", () => {
@@ -173,7 +171,7 @@ describe("ApiFailure type structure", () => {
 
   it("TransportError has message via error.message", () => {
     // Reviewer requirement: TransportError should have message
-    expectTypeOf<TransportError["error"]>().toMatchTypeOf<Error>()
+    expectTypeOf<TransportError["error"]>().toExtend<Error>()
   })
 })
 
@@ -188,7 +186,7 @@ describe("Body type correlation", () => {
     type Body = Success["body"]
 
     // Verify body structure matches schema
-    expectTypeOf<Body>().toMatchTypeOf<{ id: string; name: string; tag?: string }>()
+    expectTypeOf<Body>().toExtend<{ id: string; name: string; tag?: string }>()
   })
 
   it("404 error body is Error type for getPet", () => {
@@ -197,7 +195,7 @@ describe("Body type correlation", () => {
     type Body = ErrorType["body"]
 
     // Verify error body structure
-    expectTypeOf<Body>().toMatchTypeOf<{ code: number; message: string }>()
+    expectTypeOf<Body>().toExtend<{ code: number; message: string }>()
   })
 
   it("listPets 200 body is array of pets", () => {
@@ -205,7 +203,7 @@ describe("Body type correlation", () => {
     type Body = Success["body"]
 
     // Body should be array
-    expectTypeOf<Body>().toMatchTypeOf<Array<{ id: string; name: string; tag?: string }>>()
+    expectTypeOf<Body>().toExtend<Array<{ id: string; name: string; tag?: string }>>()
   })
 })
 
@@ -222,5 +220,142 @@ describe("ContentType correlation", () => {
   it("204 no-content has 'none' contentType", () => {
     type Success = ApiSuccess<DeletePetResponses>
     expectTypeOf<Success["contentType"]>().toEqualTypeOf<"none">()
+  })
+})
+
+// =============================================================================
+// SECTION 4.1: Is2xx generic type (no hardcoded status list)
+// =============================================================================
+
+describe("4.1: Is2xx generic type works without hardcoded status list", () => {
+  it("Is2xx<200> = true", () => {
+    expectTypeOf<Is2xx<200>>().toEqualTypeOf<true>()
+  })
+
+  it("Is2xx<201> = true", () => {
+    expectTypeOf<Is2xx<201>>().toEqualTypeOf<true>()
+  })
+
+  it("Is2xx<204> = true", () => {
+    expectTypeOf<Is2xx<204>>().toEqualTypeOf<true>()
+  })
+
+  it("Is2xx<250> = true (non-standard 2xx)", () => {
+    // This proves no hardcoded 2xx list - 250 is recognized as 2xx
+    expectTypeOf<Is2xx<250>>().toEqualTypeOf<true>()
+  })
+
+  it("Is2xx<299> = true (boundary)", () => {
+    expectTypeOf<Is2xx<299>>().toEqualTypeOf<true>()
+  })
+
+  it("Is2xx<400> = false", () => {
+    expectTypeOf<Is2xx<400>>().toEqualTypeOf<false>()
+  })
+
+  it("Is2xx<404> = false", () => {
+    expectTypeOf<Is2xx<404>>().toEqualTypeOf<false>()
+  })
+
+  it("Is2xx<500> = false", () => {
+    expectTypeOf<Is2xx<500>>().toEqualTypeOf<false>()
+  })
+
+  it("Is2xx<100> = false (1xx)", () => {
+    expectTypeOf<Is2xx<100>>().toEqualTypeOf<false>()
+  })
+
+  it("Is2xx<300> = false (3xx)", () => {
+    expectTypeOf<Is2xx<300>>().toEqualTypeOf<false>()
+  })
+})
+
+// =============================================================================
+// SECTION 4.2: Request-side constraints (path/method enforcement)
+// =============================================================================
+
+describe("4.2: PathsForMethod constrains valid paths", () => {
+  it("PathsForMethod for GET includes /pets and /pets/{petId}", () => {
+    // Both /pets and /pets/{petId} have GET methods
+    type GetPaths = PathsForMethod<Paths, "get">
+
+    // Should include both paths
+    expectTypeOf<"/pets">().toExtend<GetPaths>()
+    expectTypeOf<"/pets/{petId}">().toExtend<GetPaths>()
+  })
+
+  it("PathsForMethod for POST includes only /pets", () => {
+    // Only /pets has POST method
+    type PostPaths = PathsForMethod<Paths, "post">
+
+    expectTypeOf<"/pets">().toExtend<PostPaths>()
+  })
+
+  it("PathsForMethod for DELETE includes only /pets/{petId}", () => {
+    // Only /pets/{petId} has DELETE method
+    type DeletePaths = PathsForMethod<Paths, "delete">
+
+    expectTypeOf<"/pets/{petId}">().toExtend<DeletePaths>()
+  })
+
+  it("/pets does NOT have DELETE method", () => {
+    type DeletePaths = PathsForMethod<Paths, "delete">
+
+    // /pets does not have delete method
+    expectTypeOf<"/pets">().not.toExtend<DeletePaths>()
+  })
+
+  it("/pets/{petId} does NOT have POST method", () => {
+    type PostPaths = PathsForMethod<Paths, "post">
+
+    // /pets/{petId} does not have post method
+    expectTypeOf<"/pets/{petId}">().not.toExtend<PostPaths>()
+  })
+
+  it("PathsForMethod for PUT is never (no PUT in schema)", () => {
+    // No paths have PUT method in petstore schema
+    type PutPaths = PathsForMethod<Paths, "put">
+
+    expectTypeOf<PutPaths>().toEqualTypeOf<never>()
+  })
+})
+
+// =============================================================================
+// SECTION 4.3: Non-standard 2xx status (250) is treated as success
+// This proves Is2xx is generic and doesn't hardcode standard statuses
+// =============================================================================
+
+describe("4.3: Schema with non-standard 250 status", () => {
+  // This type represents a schema where 250 is a success status
+  type CustomGetResponses = CustomOperations["customGet"]["responses"]
+
+  it("250 is treated as success status (not error)", () => {
+    // ApiSuccess should include 250 because Is2xx<250> = true
+    type Success = ApiSuccess<CustomGetResponses>
+
+    // Status should be exactly 250
+    expectTypeOf<Success["status"]>().toEqualTypeOf<250>()
+  })
+
+  it("250 success body has correct type", () => {
+    type Success = ApiSuccess<CustomGetResponses>
+    type Body = Success["body"]
+
+    // Body should be CustomResponse type
+    expectTypeOf<Body>().toExtend<{ message: string }>()
+  })
+
+  it("400 is treated as error status", () => {
+    type ErrorType = HttpError<CustomGetResponses>
+
+    // Only 400 should be in error channel
+    expectTypeOf<ErrorType["status"]>().toEqualTypeOf<400>()
+  })
+
+  it("250 is NOT in HttpError", () => {
+    type ErrorType = HttpError<CustomGetResponses>
+
+    // 250 is success, not error
+    expectTypeOf<250>().not.toExtend<ErrorType["status"]>()
   })
 })

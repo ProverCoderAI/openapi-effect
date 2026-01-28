@@ -127,8 +127,8 @@ const createPetExample = Effect.gen(function*() {
     "/pets",
     dispatchercreatePet,
     {
-      body: JSON.stringify(newPet),
-      headers: { "Content-Type": "application/json" }
+      // Typed body - client will auto-stringify and set Content-Type
+      body: newPet
     }
   )
 
