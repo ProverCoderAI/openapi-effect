@@ -294,12 +294,59 @@ export default defineConfig(
     },
   },
 
-  // 3) Для JS-файлов отключим типо-зависимые проверки
+  // 3) Axioms module is allowed to use unknown for boundary type conversions
+  {
+    files: ['src/core/axioms.ts'],
+    rules: {
+      'no-restricted-syntax': ['error',
+        // Keep all restrictions except TSUnknownKeyword
+        {
+          selector: "TryStatement",
+          message: "Используй Effect.try / catchAll вместо try/catch в core/app/domain.",
+        },
+        {
+          selector: "SwitchStatement",
+          message: "Switch statements are forbidden. Use Effect.Match instead.",
+        },
+        {
+          selector: 'CallExpression[callee.name="require"]',
+          message: "Avoid using require(). Use ES6 imports instead.",
+        },
+      ],
+      '@typescript-eslint/no-restricted-types': 'off',
+      // Axiom type casting functions intentionally use single-use type parameters
+      '@typescript-eslint/no-unnecessary-type-parameters': 'off',
+    },
+  },
+
+  // 4) Shell API client boundary layer is allowed to use unknown
+  {
+    files: ['src/shell/api-client/**/*.ts'],
+    rules: {
+      'no-restricted-syntax': ['error',
+        {
+          selector: "TryStatement",
+          message: "Используй Effect.try / catchAll вместо try/catch в core/app/domain.",
+        },
+        {
+          selector: "SwitchStatement",
+          message: "Switch statements are forbidden. Use Effect.Match instead.",
+        },
+        {
+          selector: 'CallExpression[callee.name="require"]',
+          message: "Avoid using require(). Use ES6 imports instead.",
+        },
+      ],
+      '@typescript-eslint/no-restricted-types': 'off',
+    },
+  },
+
+  // 5) Для JS-файлов отключим типо-зависимые проверки
   {
     files: ['**/*.{js,cjs,mjs}'],
     extends: [tseslint.configs.disableTypeChecked],
   },
 
-  // 4) Глобальные игноры
+  // 6) Глобальные игноры
   { ignores: ['dist/**', 'build/**', 'coverage/**', '**/dist/**'] },
 );

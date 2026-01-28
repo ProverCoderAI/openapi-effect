@@ -12,11 +12,13 @@
     "lint": "npx @ton-ai-core/vibecode-linter src/",
     "lint:tests": "npx @ton-ai-core/vibecode-linter tests/",
     "lint:effect": "npx eslint --config eslint.effect-ts-check.config.mjs .",
+    "lint:types": "./scripts/lint-types.sh",
     "check": "pnpm run typecheck",
     "prestart": "pnpm run build",
     "start": "node dist/main.js",
     "test": "pnpm run lint:tests && vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "gen:strict-api": "npx ts-node --esm scripts/gen-strict-api.ts"
   },
   "repository": {
     "type": "git",
@@ -50,6 +52,7 @@
     "@effect/typeclass": "^0.38.0",
     "@effect/workflow": "^0.16.0",
     "effect": "^3.19.15",
+    "openapi-typescript-helpers": "^0.0.15",
     "ts-morph": "^27.0.2"
   },
   "devDependencies": {

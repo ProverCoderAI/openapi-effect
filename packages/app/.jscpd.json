@@ -7,7 +7,12 @@
 		"**/build/**",
 		"**/dist/**",
 		"**/*.min.js",
-		"**/reports/**"
+		"**/reports/**",
+		"**/generated/**",
+		"**/fixtures/**",
+		"**/tests/api-client/**",
+		"**/src/shell/api-client/create-client.ts",
+		"**/src/index.ts"
 	],
 	"skipComments": true,
 	"ignorePattern": [
