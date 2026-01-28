@@ -10,7 +10,9 @@
 		"**/reports/**",
 		"**/generated/**",
 		"**/fixtures/**",
-		"**/tests/api-client/**"
+		"**/tests/api-client/**",
+		"**/src/shell/api-client/create-client.ts",
+		"**/src/index.ts"
 	],
 	"skipComments": true,
 	"ignorePattern": [

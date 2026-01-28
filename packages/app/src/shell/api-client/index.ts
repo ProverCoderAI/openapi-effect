@@ -24,3 +24,7 @@ export {
   unexpectedContentType,
   unexpectedStatus
 } from "./strict-client.js"
+
+// High-level client creation API
+export type { ClientOptions, StrictApiClient } from "./create-client.js"
+export { createClient } from "./create-client.js"
