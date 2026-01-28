@@ -3,7 +3,7 @@
 	"compilerOptions": {
 		"rootDir": ".",
 		"outDir": "dist",
-		"types": ["vitest"],
+		"types": ["vitest", "node"],
 		"lib": ["ES2022", "DOM", "DOM.Iterable"],
 		"baseUrl": ".",
 		"paths": {
@@ -13,6 +13,7 @@
 	"include": [
 		"src/**/*",
 		"tests/**/*",
+		"examples/**/*",
 		"vite.config.ts",
 		"vitest.config.ts"
 	],

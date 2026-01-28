@@ -48,7 +48,7 @@ export type RequestOptions = {
  * @pure false - operations perform HTTP requests
  * @effect All methods return Effect<Success, Failure, never>
  */
-export type StrictApiClient<Paths extends Record<string, unknown>> = {
+export type StrictApiClient<Paths extends object> = {
   readonly GET: <
     Path extends Extract<keyof Paths, string>,
     Op = Paths[Path] extends { get: infer G } ? G : never,
@@ -238,7 +238,7 @@ const createMethodHandler = (
  * })
  * ```
  */
-export const createClient = <Paths extends Record<string, unknown>>(
+export const createClient = <Paths extends object>(
   options: ClientOptions
 ): StrictApiClient<Paths> => ({
   GET: createMethodHandler("get", options),
