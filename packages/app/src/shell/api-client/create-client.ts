@@ -18,7 +18,7 @@ import type {
   StrictApiClientWithDispatchers
 } from "./create-client-types.js"
 import type { StrictRequestInit } from "./strict-client.js"
-import { executeRequest } from "./strict-client.js"
+import { createUniversalDispatcher, executeRequest } from "./strict-client.js"
 
 export type {
   ClientOptions,
@@ -26,6 +26,7 @@ export type {
   StrictApiClient,
   StrictApiClientWithDispatchers
 } from "./create-client-types.js"
+export { createUniversalDispatcher } from "./strict-client.js"
 
 /**
  * Primitive value type for path/query parameters
@@ -321,5 +322,90 @@ export const createClient = <Paths extends object>(
     PATCH: createMethodHandlerWithDispatchers("patch", options, resolvedDispatchers),
     HEAD: createMethodHandlerWithDispatchers("head", options, resolvedDispatchers),
     OPTIONS: createMethodHandlerWithDispatchers("options", options, resolvedDispatchers)
+  })
+}
+
+// CHANGE: Add createMethodHandlerWithUniversalDispatcher for zero-boilerplate client
+// WHY: Enable createClientEffect<Paths>(options) without code generation or dispatcher registry
+// QUOTE(ТЗ): "Я не хочу создавать какие-то дополнительные модули"
+// REF: issue-5
+// SOURCE: n/a
+// FORMAT THEOREM: ∀ path, method: universalDispatcher handles response classification generically
+// PURITY: SHELL
+// EFFECT: Effect<ApiSuccess<Responses>, ApiFailure<Responses>, HttpClient>
+// INVARIANT: 2xx → success channel, non-2xx → error channel
+// COMPLEXITY: O(1) handler creation + O(1) universal dispatcher creation per call
+const createMethodHandlerWithUniversalDispatcher = (
+  method: HttpMethod,
+  clientOptions: ClientOptions
+) =>
+(
+  path: string,
+  options?: MethodHandlerOptions
+) =>
+  createMethodHandler(method, clientOptions)(
+    path,
+    createUniversalDispatcher(),
+    options
+  )
+
+// CHANGE: Add createClientEffect — zero-boilerplate Effect-based API client
+// WHY: Enable the user's desired DSL without any generated code or dispatcher setup
+// QUOTE(ТЗ): "const apiClientEffect = createClientEffect<Paths>(clientOptions); apiClientEffect.POST('/api/auth/login', { body: credentials })"
+// REF: issue-5
+// SOURCE: n/a
+// FORMAT THEOREM: ∀ Paths, options: createClientEffect<Paths>(options) → StrictApiClientWithDispatchers<Paths>
+// PURITY: SHELL
+// EFFECT: Client methods return Effect<ApiSuccess, ApiFailure, HttpClient>
+// INVARIANT: ∀ path, method: path ∈ PathsForMethod<Paths, method> (compile-time) ∧ response classified by status range (runtime)
+// COMPLEXITY: O(1) client creation
+/**
+ * Create type-safe Effect-based API client with zero boilerplate
+ *
+ * Uses a universal dispatcher that classifies responses by HTTP status range:
+ * - 2xx → success channel (ApiSuccess)
+ * - non-2xx → error channel (HttpError)
+ * - JSON parsed automatically for application/json content types
+ *
+ * **No code generation needed.** No dispatcher registry needed.
+ * Just pass your OpenAPI Paths type and client options.
+ *
+ * @typeParam Paths - OpenAPI paths type from openapi-typescript
+ * @param options - Client configuration (baseUrl, credentials, headers, etc.)
+ * @returns API client with typed methods for all operations
+ *
+ * @pure false - creates client that performs HTTP requests
+ * @effect Client methods return Effect<Success, Failure, HttpClient>
+ * @invariant ∀ path, method: path ∈ PathsForMethod<Paths, method>
+ * @complexity O(1) client creation
+ *
+ * @example
+ * ```typescript
+ * import { createClientEffect, type ClientOptions } from "openapi-effect"
+ * import type { paths } from "./openapi.d.ts"
+ *
+ * const clientOptions: ClientOptions = {
+ *   baseUrl: "https://petstore.example.com",
+ *   credentials: "include"
+ * }
+ * const apiClientEffect = createClientEffect<paths>(clientOptions)
+ *
+ * // Type-safe call — path, method, and body all enforced at compile time
+ * const result = yield* apiClientEffect.POST("/api/auth/login", {
+ *   body: { email: "user@example.com", password: "secret" }
+ * })
+ * ```
+ */
+export const createClientEffect = <Paths extends object>(
+  options: ClientOptions
+): StrictApiClientWithDispatchers<Paths> => {
+  return asStrictApiClient<StrictApiClientWithDispatchers<Paths>>({
+    GET: createMethodHandlerWithUniversalDispatcher("get", options),
+    POST: createMethodHandlerWithUniversalDispatcher("post", options),
+    PUT: createMethodHandlerWithUniversalDispatcher("put", options),
+    DELETE: createMethodHandlerWithUniversalDispatcher("delete", options),
+    PATCH: createMethodHandlerWithUniversalDispatcher("patch", options),
+    HEAD: createMethodHandlerWithUniversalDispatcher("head", options),
+    OPTIONS: createMethodHandlerWithUniversalDispatcher("options", options)
   })
 }

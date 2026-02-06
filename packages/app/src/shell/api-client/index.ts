@@ -19,6 +19,7 @@ export type {
 export {
   createDispatcher,
   createStrictClient,
+  createUniversalDispatcher,
   executeRequest,
   parseJSON,
   unexpectedContentType,
@@ -27,4 +28,4 @@ export {
 
 // High-level client creation API
 export type { ClientOptions, DispatchersFor, StrictApiClient, StrictApiClientWithDispatchers } from "./create-client.js"
-export { createClient, registerDefaultDispatchers } from "./create-client.js"
+export { createClient, createClientEffect, registerDefaultDispatchers } from "./create-client.js"

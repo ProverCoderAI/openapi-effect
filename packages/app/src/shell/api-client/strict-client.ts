@@ -390,4 +390,82 @@ export const createStrictClient = <Paths extends object>(): StrictClient<
   } satisfies StrictClient<Paths>
 }
 
+// CHANGE: Add universal dispatcher that handles any OpenAPI responses generically
+// WHY: Enable createClient<Paths>(options) without code generation or manual dispatcher wiring
+// QUOTE(ТЗ): "Я не хочу создавать какие-то дополнительные модули"
+// REF: issue-5
+// SOURCE: n/a
+// FORMAT THEOREM: ∀ status, ct: universalDispatcher(status, ct, text) → success(2xx) ∨ httpError(non-2xx) ∨ boundaryError
+// PURITY: SHELL
+// EFFECT: Effect<ApiSuccess<Responses>, Exclude<ApiFailure<Responses>, TransportError>, never>
+// INVARIANT: 2xx → success channel, non-2xx → error channel, no-content → body: undefined
+// COMPLEXITY: O(1) per dispatch + O(|text|) for JSON parsing
+
+/**
+ * Create a universal dispatcher that handles any OpenAPI response generically
+ *
+ * The universal dispatcher classifies responses by status code range:
+ * - 2xx → success channel (ApiSuccess)
+ * - non-2xx → error channel (HttpError)
+ *
+ * For JSON content types, it parses the body. For no-content responses (empty body),
+ * it returns undefined body with contentType "none".
+ *
+ * This enables using createClient<Paths>(options) without generating
+ * per-operation dispatchers, fulfilling the zero-boilerplate DSL requirement.
+ *
+ * @pure true - returns pure dispatcher function
+ * @complexity O(1) creation + O(|body|) per dispatch
+ */
+export const createUniversalDispatcher = <Responses>(): Dispatcher<Responses> => {
+  return asDispatcher<Responses>((response: RawResponse) => {
+    const contentType = response.headers.get("content-type") ?? undefined
+    const is2xx = response.status >= 200 && response.status < 300
+
+    // No-content response (empty body or 204)
+    if (response.text === "" || response.status === 204) {
+      const variant = {
+        status: response.status,
+        contentType: "none" as const,
+        body: undefined
+      } as const
+
+      return is2xx
+        ? Effect.succeed(variant)
+        : Effect.fail({
+          _tag: "HttpError" as const,
+          ...variant
+        })
+    }
+
+    // JSON content type
+    if (contentType?.includes("application/json")) {
+      return Effect.gen(function*() {
+        const parsed = yield* parseJSON(response.status, "application/json", response.text)
+        const variant = {
+          status: response.status,
+          contentType: "application/json" as const,
+          body: parsed
+        } as const
+
+        if (is2xx) {
+          return variant
+        }
+        return yield* Effect.fail({
+          _tag: "HttpError" as const,
+          ...variant
+        })
+      })
+    }
+
+    // Unknown content type
+    return Effect.fail(unexpectedContentType(
+      response.status,
+      ["application/json"],
+      contentType,
+      response.text
+    ))
+  })
+}
+
 export { type Dispatcher, type RawResponse } from "../../core/axioms.js"
