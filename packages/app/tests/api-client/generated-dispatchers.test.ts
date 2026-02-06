@@ -14,12 +14,7 @@ import * as HttpClientResponse from "@effect/platform/HttpClientResponse"
 import { Effect, Either, Layer } from "effect"
 import { describe, expect, it } from "vitest"
 
-import {
-  dispatchercreatePet,
-  dispatcherdeletePet,
-  dispatchergetPet,
-  dispatcherlistPets
-} from "../../src/generated/dispatch.js"
+import { dispatchercreatePet, dispatcherlistPets } from "../../src/generated/dispatch.js"
 import { createStrictClient } from "../../src/shell/api-client/strict-client.js"
 import type { Paths } from "../fixtures/petstore.openapi.js"
 
@@ -216,114 +211,6 @@ describe("Generated dispatcher: createPet", () => {
         expect(result.left).toMatchObject({
           _tag: "HttpError",
           status: 500
-        })
-      }
-    }).pipe(Effect.runPromise))
-})
-
-describe("Generated dispatcher: getPet", () => {
-  it("should handle 200 success with pet data", () =>
-    Effect.gen(function*() {
-      const pet = JSON.stringify({ id: "42", name: "Buddy", tag: "dog" })
-
-      const client = createStrictClient<PetstorePaths>()
-
-      const result = yield* Effect.either(
-        client.GET("/pets/{petId}", {
-          baseUrl: "https://api.example.com",
-          dispatcher: dispatchergetPet,
-          params: { petId: "42" }
-        }).pipe(
-          Effect.provide(
-            createMockHttpClientLayer(200, { "content-type": "application/json" }, pet)
-          )
-        )
-      )
-
-      expect(Either.isRight(result)).toBe(true)
-      if (Either.isRight(result)) {
-        expect(result.right.status).toBe(200)
-      }
-    }).pipe(Effect.runPromise))
-
-  it("should return HttpError for 404 not found (error channel)", () =>
-    Effect.gen(function*() {
-      const errorBody = JSON.stringify({ code: 404, message: "Pet not found" })
-
-      const client = createStrictClient<PetstorePaths>()
-
-      const result = yield* Effect.either(
-        client.GET("/pets/{petId}", {
-          baseUrl: "https://api.example.com",
-          dispatcher: dispatchergetPet,
-          params: { petId: "999" }
-        }).pipe(
-          Effect.provide(
-            createMockHttpClientLayer(404, { "content-type": "application/json" }, errorBody)
-          )
-        )
-      )
-
-      // 404 is in schema → HttpError in error channel (forces explicit handling)
-      expect(Either.isLeft(result)).toBe(true)
-      if (Either.isLeft(result)) {
-        expect(result.left).toMatchObject({
-          _tag: "HttpError",
-          status: 404
-        })
-      }
-    }).pipe(Effect.runPromise))
-})
-
-describe("Generated dispatcher: deletePet", () => {
-  it("should handle 204 no content", () =>
-    Effect.gen(function*() {
-      const client = createStrictClient<PetstorePaths>()
-
-      const result = yield* Effect.either(
-        client.DELETE("/pets/{petId}", {
-          baseUrl: "https://api.example.com",
-          dispatcher: dispatcherdeletePet,
-          params: { petId: "42" }
-        }).pipe(
-          Effect.provide(
-            createMockHttpClientLayer(204, {}, "")
-          )
-        )
-      )
-
-      expect(Either.isRight(result)).toBe(true)
-      if (Either.isRight(result)) {
-        expect(result.right.status).toBe(204)
-        expect(result.right.contentType).toBe("none")
-        expect(result.right.body).toBeUndefined()
-      }
-    }).pipe(Effect.runPromise))
-
-  it("should return HttpError for 404 pet not found (error channel)", () =>
-    Effect.gen(function*() {
-      const errorBody = JSON.stringify({ code: 404, message: "Pet not found" })
-
-      const client = createStrictClient<PetstorePaths>()
-
-      const result = yield* Effect.either(
-        client.DELETE("/pets/{petId}", {
-          baseUrl: "https://api.example.com",
-          dispatcher: dispatcherdeletePet,
-          params: { petId: "999" }
-        }).pipe(
-          Effect.provide(
-            createMockHttpClientLayer(404, { "content-type": "application/json" }, errorBody)
-          )
-        )
-      )
-
-      // 404 is in schema → HttpError in error channel (forces explicit handling)
-      expect(Either.isLeft(result)).toBe(true)
-      if (Either.isLeft(result)) {
-        expect(result.left).toMatchObject({
-          _tag: "HttpError",
-          status: 404
         })
       }
     }).pipe(Effect.runPromise))

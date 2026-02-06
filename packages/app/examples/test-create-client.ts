@@ -8,8 +8,11 @@
 
 import * as FetchHttpClient from "@effect/platform/FetchHttpClient"
 import { Console, Effect, Exit, Match } from "effect"
-import { createClient, type ClientOptions } from "../src/shell/api-client/create-client.js"
-import { dispatchercreatePet, dispatchergetPet, dispatcherlistPets } from "../src/generated/dispatch.js"
+import {
+  createClient,
+  type ClientOptions
+} from "../src/shell/api-client/create-client.js"
+import "../src/generated/dispatchers-by-path.js"
 import type { Paths } from "../tests/fixtures/petstore.openapi.js"
 // Types are automatically inferred - no need to import them explicitly
 
@@ -24,6 +27,16 @@ const clientOptions: ClientOptions = {
   credentials: "include"
 }
 
+// CHANGE: Use default dispatcher registry (registered by generated module)
+// WHY: Call createClient(options) without passing dispatcher map
+// QUOTE(ТЗ): "const apiClient = createClient<Paths>(clientOptions)"
+// REF: user-msg-4
+// SOURCE: n/a
+// FORMAT THEOREM: ∀ op ∈ Operations: createClient(options) uses registered dispatchers
+// PURITY: SHELL
+// EFFECT: none
+// INVARIANT: default dispatchers registered before client creation
+// COMPLEXITY: O(1)
 const apiClient = createClient<Paths>(clientOptions)
 
 /**
@@ -44,7 +57,6 @@ const listAllPetsExample = Effect.gen(function*() {
   // Now: success = 200 only, error = 500 | BoundaryError
   const result = yield* apiClient.GET(
     "/pets",
-    dispatcherlistPets,
     {
       query: { limit: 10 }
     }
@@ -83,7 +95,6 @@ const getPetExample = Effect.gen(function*() {
   // Success = 200, Error = 404 | 500 | BoundaryError
   const result = yield* apiClient.GET(
     "/pets/{petId}",
-    dispatchergetPet,
     {
       params: { petId: "123" }
     }
@@ -125,7 +136,6 @@ const createPetExample = Effect.gen(function*() {
   // Success = 201, Error = 400 | 500 | BoundaryError
   const result = yield* apiClient.POST(
     "/pets",
-    dispatchercreatePet,
     {
       // Typed body - client will auto-stringify and set Content-Type
       body: newPet
@@ -159,7 +169,7 @@ const eitherExample = Effect.gen(function*() {
   yield* Console.log("\n=== Example 4: Using Effect.either ===")
 
   const result = yield* Effect.either(
-    apiClient.GET("/pets/{petId}", dispatchergetPet, {
+    apiClient.GET("/pets/{petId}", {
       params: { petId: "999" } // Non-existent pet
     })
   )
@@ -199,7 +209,7 @@ const mainProgram = Effect.gen(function*() {
   yield* Console.log("  - Developers MUST handle HTTP errors explicitly!\n")
 
   yield* Console.log("Example code:")
-  yield* Console.log('  const result = yield* client.GET("/path", dispatcher)')
+  yield* Console.log('  const result = yield* client.GET("/path", { params })')
   yield* Console.log("  // result is 200 - no need to check status!")
   yield* Console.log("").pipe(Effect.flatMap(() =>
     Console.log("  // HTTP errors handled via Effect.catchTag or Effect.match\n")

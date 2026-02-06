@@ -8,9 +8,9 @@
 
 import * as FetchHttpClient from "@effect/platform/FetchHttpClient"
 import type * as HttpClient from "@effect/platform/HttpClient"
-import { Console, Effect, Exit, Match } from "effect"
-import { createClient, type ClientOptions } from "../src/shell/api-client/create-client.js"
-import { dispatchercreatePet, dispatchergetPet, dispatcherlistPets } from "../src/generated/dispatch.js"
+import { Cause, Console, Effect, Match } from "effect"
+import "../src/generated/dispatchers-by-path.js"
+import { type ClientOptions, createClient } from "../src/shell/api-client/create-client.js"
 import type { Paths } from "../tests/fixtures/petstore.openapi.js"
 
 /**
@@ -21,6 +21,16 @@ const clientOptions: ClientOptions = {
   credentials: "include"
 }
 
+// CHANGE: Use default dispatcher registry (registered by generated module)
+// WHY: Call createClient(options) without passing dispatcher map
+// QUOTE(ТЗ): "const apiClient = createClient<Paths>(clientOptions)"
+// REF: user-msg-4
+// SOURCE: n/a
+// FORMAT THEOREM: ∀ op ∈ Operations: createClient(options) uses registered dispatchers
+// PURITY: SHELL
+// EFFECT: none
+// INVARIANT: default dispatchers registered before client creation
+// COMPLEXITY: O(1)
 const apiClient = createClient<Paths>(clientOptions)
 
 // =============================================================================
@@ -45,14 +55,9 @@ export const getPetStrictProgram: Effect.Effect<void, never, HttpClient.HttpClie
   yield* Console.log("=== getPet: Strict Error Handling ===")
 
   // Execute request - yields only on 200
-  const result = yield* apiClient.GET(
-    "/pets/{petId}",
-    dispatchergetPet,
-    { params: { petId: "123" } }
+  yield* apiClient.GET("/pets/{petId}", { params: { petId: "123" } }).pipe(
+    Effect.tap((result) => Console.log(`Got pet: ${result.body.name}`))
   )
-
-  // Success! TypeScript knows status is 200
-  yield* Console.log(`Got pet: ${result.body.name}`)
 }).pipe(
   // Handle HttpError with EXHAUSTIVE matching (no orElse!)
   Effect.catchTag("HttpError", (error) =>
@@ -66,7 +71,7 @@ export const getPetStrictProgram: Effect.Effect<void, never, HttpClient.HttpClie
   // Handle ALL boundary errors
   Effect.catchTag("TransportError", (e) => Console.log(`Transport error: ${e.error.message}`)),
   Effect.catchTag("UnexpectedStatus", (e) => Console.log(`Unexpected status: ${e.status}`)),
-  Effect.catchTag("UnexpectedContentType", (e) => Console.log(`Unexpected content-type: ${e.actual}`)),
+  Effect.catchTag("UnexpectedContentType", (e) => Console.log(`Unexpected content-type: ${e.actual ?? "unknown"}`)),
   Effect.catchTag("ParseError", (e) => Console.log(`Parse error: ${e.error.message}`)),
   Effect.catchTag("DecodeError", (e) => Console.log(`Decode error: ${e.error.message}`))
 )
@@ -87,17 +92,15 @@ export const getPetStrictProgram: Effect.Effect<void, never, HttpClient.HttpClie
 export const createPetStrictProgram: Effect.Effect<void, never, HttpClient.HttpClient> = Effect.gen(function*() {
   yield* Console.log("=== createPet: Strict Error Handling ===")
 
-  const result = yield* apiClient.POST(
+  yield* apiClient.POST(
     "/pets",
-    dispatchercreatePet,
     {
       // Body can be typed object - client will auto-stringify and set Content-Type
       body: { name: "Fluffy", tag: "cat" }
     }
+  ).pipe(
+    Effect.tap((result) => Console.log(`Created pet: ${result.body.id}`))
   )
-
-  // Success! TypeScript knows status is 201
-  yield* Console.log(`Created pet: ${result.body.id}`)
 }).pipe(
   // Handle HttpError with EXHAUSTIVE matching
   Effect.catchTag("HttpError", (error) =>
@@ -110,7 +113,7 @@ export const createPetStrictProgram: Effect.Effect<void, never, HttpClient.HttpC
   // Handle ALL boundary errors
   Effect.catchTag("TransportError", (e) => Console.log(`Transport error: ${e.error.message}`)),
   Effect.catchTag("UnexpectedStatus", (e) => Console.log(`Unexpected status: ${e.status}`)),
-  Effect.catchTag("UnexpectedContentType", (e) => Console.log(`Unexpected content-type: ${e.actual}`)),
+  Effect.catchTag("UnexpectedContentType", (e) => Console.log(`Unexpected content-type: ${e.actual ?? "unknown"}`)),
   Effect.catchTag("ParseError", (e) => Console.log(`Parse error: ${e.error.message}`)),
   Effect.catchTag("DecodeError", (e) => Console.log(`Decode error: ${e.error.message}`))
 )
@@ -131,14 +134,13 @@ export const createPetStrictProgram: Effect.Effect<void, never, HttpClient.HttpC
 export const listPetsStrictProgram: Effect.Effect<void, never, HttpClient.HttpClient> = Effect.gen(function*() {
   yield* Console.log("=== listPets: Strict Error Handling ===")
 
-  const result = yield* apiClient.GET(
-    "/pets",
-    dispatcherlistPets,
-    { query: { limit: 10 } }
+  yield* apiClient.GET("/pets", { query: { limit: 10 } }).pipe(
+    Effect.tap((result) => Console.log(`Got ${result.body.length} pets`))
   )
 
-  // Success! TypeScript knows status is 200
-  yield* Console.log(`Got ${result.body.length} pets`)
+  const pets = yield* apiClient.GET("/pets", { query: { limit: 10 } })
+
+  yield* Console.log(`Got ${pets.body.length} pets`)
 }).pipe(
   // Handle HttpError with EXHAUSTIVE matching
   Effect.catchTag("HttpError", (error) =>
@@ -150,7 +152,7 @@ export const listPetsStrictProgram: Effect.Effect<void, never, HttpClient.HttpCl
   // Handle ALL boundary errors
   Effect.catchTag("TransportError", (e) => Console.log(`Transport error: ${e.error.message}`)),
   Effect.catchTag("UnexpectedStatus", (e) => Console.log(`Unexpected status: ${e.status}`)),
-  Effect.catchTag("UnexpectedContentType", (e) => Console.log(`Unexpected content-type: ${e.actual}`)),
+  Effect.catchTag("UnexpectedContentType", (e) => Console.log(`Unexpected content-type: ${e.actual ?? "unknown"}`)),
   Effect.catchTag("ParseError", (e) => Console.log(`Parse error: ${e.error.message}`)),
   Effect.catchTag("DecodeError", (e) => Console.log(`Decode error: ${e.error.message}`))
 )
@@ -183,22 +185,19 @@ const mainProgram: Effect.Effect<void, never, HttpClient.HttpClient> = Effect.ge
   yield* Console.log("========================================")
 })
 
-/**
- * Execute the program
- *
- * CRITICAL: Since mainProgram has E=never, Effect.runPromiseExit
- * will never fail with a typed error - only defects are possible.
- */
+// CHANGE: Remove async/await entrypoint and handle defects in Effect
+// WHY: Lint rules forbid async/await and floating promises; defects are handled in Effect channel
+// QUOTE(ТЗ): "Запрещён async/await — используй Effect.gen / Effect.tryPromise."
+// REF: user-msg-2
+// SOURCE: n/a
+// FORMAT THEOREM: For all exits, mainProgram E=never implies failure(exit) -> defect(exit)
+// PURITY: SHELL
+// EFFECT: Effect<void, never, HttpClient> -> Promise<void> via Effect.runPromise
+// INVARIANT: Typed error channel remains never
+// COMPLEXITY: O(1)
 const program = mainProgram.pipe(
-  Effect.provide(FetchHttpClient.layer)
+  Effect.provide(FetchHttpClient.layer),
+  Effect.catchAllCause((cause) => Console.error(`Unexpected defect: ${Cause.pretty(cause)}`))
 )
 
-const main = async () => {
-  const exit = await Effect.runPromiseExit(program)
-  if (Exit.isFailure(exit)) {
-    // This can only be a defect (unexpected exception), not a typed error
-    console.error("Unexpected defect:", exit.cause)
-  }
-}
-
-main()
+void Effect.runPromise(program)

@@ -6,3 +6,4 @@
 
 export * from "./decoders.js"
 export * from "./dispatch.js"
+export * from "./dispatchers-by-path.js"

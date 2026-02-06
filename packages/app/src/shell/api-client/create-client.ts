@@ -8,33 +8,24 @@
 // INVARIANT: All operations are type-safe from path → operation → request → response
 // COMPLEXITY: O(1) client creation
 
-import type * as HttpClient from "@effect/platform/HttpClient"
-import type { Effect } from "effect"
 import type { HttpMethod } from "openapi-typescript-helpers"
 
+import { asDispatchersFor, asStrictApiClient, asStrictRequestInit, type Dispatcher } from "../../core/axioms.js"
 import type {
-  ApiFailure,
-  ApiSuccess,
-  OperationFor,
-  PathsForMethod,
-  RequestOptionsFor,
-  ResponsesFor
-} from "../../core/api-client/strict-types.js"
-import { asStrictApiClient, asStrictRequestInit, type Dispatcher } from "../../core/axioms.js"
+  ClientOptions,
+  DispatchersFor,
+  DispatchersForMethod,
+  StrictApiClientWithDispatchers
+} from "./create-client-types.js"
 import type { StrictRequestInit } from "./strict-client.js"
 import { executeRequest } from "./strict-client.js"
 
-/**
- * Client configuration options
- *
- * @pure - immutable configuration
- */
-export type ClientOptions = {
-  readonly baseUrl: string
-  readonly credentials?: RequestCredentials
-  readonly headers?: HeadersInit
-  readonly fetch?: typeof globalThis.fetch
-}
+export type {
+  ClientOptions,
+  DispatchersFor,
+  StrictApiClient,
+  StrictApiClientWithDispatchers
+} from "./create-client-types.js"
 
 /**
  * Primitive value type for path/query parameters
@@ -50,121 +41,41 @@ type ParamValue = string | number | boolean
  */
 type QueryValue = ParamValue | ReadonlyArray<ParamValue>
 
+// CHANGE: Add default dispatcher registry for auto-dispatching createClient
+// WHY: Allow createClient(options) without explicitly passing dispatcher map
+// QUOTE(ТЗ): "const apiClient = createClient<Paths>(clientOptions)"
+// REF: user-msg-4
+// SOURCE: n/a
+// FORMAT THEOREM: ∀ call: defaultDispatchers = dispatchersByPath ⇒ createClient uses dispatcher(path, method)
+// PURITY: SHELL
+// EFFECT: none
+// INVARIANT: defaultDispatchers is set before createClient use
+// COMPLEXITY: O(1)
+let defaultDispatchers: DispatchersFor<object> | undefined
+
 /**
- * Type-safe API client with full request-side type enforcement
+ * Register default dispatcher map used by createClient(options)
  *
- * **Key guarantees:**
- * 1. GET only works on paths that have `get` method in schema
- * 2. POST only works on paths that have `post` method in schema
- * 3. Dispatcher type is derived from operation's responses
- * 4. Request options (params/query/body) are derived from operation
- *
- * **Effect Channel Design:**
- * - Success channel: `ApiSuccess<Responses>` - 2xx responses only
- * - Error channel: `ApiFailure<Responses>` - HTTP errors (4xx, 5xx) + boundary errors
- *
- * @typeParam Paths - OpenAPI paths type from openapi-typescript
- *
- * @pure false - operations perform HTTP requests
- * @invariant ∀ call: path ∈ PathsForMethod<Paths, method> ∧ options derived from operation
+ * @pure false - mutates module-level registry
+ * @invariant defaultDispatchers set exactly once per app boot
  */
-export type StrictApiClient<Paths extends object> = {
-  /**
-   * Execute GET request
-   *
-   * @typeParam Path - Path that supports GET method (enforced at type level)
-   * @param path - API path with GET method
-   * @param dispatcher - Response dispatcher (must match operation responses)
-   * @param options - Request options (typed from operation)
-   * @returns Effect with 2xx in success channel, errors in error channel
-   */
-  readonly GET: <Path extends PathsForMethod<Paths, "get">>(
-    path: Path,
-    dispatcher: Dispatcher<ResponsesFor<OperationFor<Paths, Path, "get">>>,
-    options?: RequestOptionsFor<OperationFor<Paths, Path, "get">>
-  ) => Effect.Effect<
-    ApiSuccess<ResponsesFor<OperationFor<Paths, Path, "get">>>,
-    ApiFailure<ResponsesFor<OperationFor<Paths, Path, "get">>>,
-    HttpClient.HttpClient
-  >
+export const registerDefaultDispatchers = <Paths extends object>(
+  dispatchers: DispatchersFor<Paths>
+): void => {
+  defaultDispatchers = dispatchers
+}
 
-  /**
-   * Execute POST request
-   */
-  readonly POST: <Path extends PathsForMethod<Paths, "post">>(
-    path: Path,
-    dispatcher: Dispatcher<ResponsesFor<OperationFor<Paths, Path, "post">>>,
-    options?: RequestOptionsFor<OperationFor<Paths, Path, "post">>
-  ) => Effect.Effect<
-    ApiSuccess<ResponsesFor<OperationFor<Paths, Path, "post">>>,
-    ApiFailure<ResponsesFor<OperationFor<Paths, Path, "post">>>,
-    HttpClient.HttpClient
-  >
-
-  /**
-   * Execute PUT request
-   */
-  readonly PUT: <Path extends PathsForMethod<Paths, "put">>(
-    path: Path,
-    dispatcher: Dispatcher<ResponsesFor<OperationFor<Paths, Path, "put">>>,
-    options?: RequestOptionsFor<OperationFor<Paths, Path, "put">>
-  ) => Effect.Effect<
-    ApiSuccess<ResponsesFor<OperationFor<Paths, Path, "put">>>,
-    ApiFailure<ResponsesFor<OperationFor<Paths, Path, "put">>>,
-    HttpClient.HttpClient
-  >
-
-  /**
-   * Execute DELETE request
-   */
-  readonly DELETE: <Path extends PathsForMethod<Paths, "delete">>(
-    path: Path,
-    dispatcher: Dispatcher<ResponsesFor<OperationFor<Paths, Path, "delete">>>,
-    options?: RequestOptionsFor<OperationFor<Paths, Path, "delete">>
-  ) => Effect.Effect<
-    ApiSuccess<ResponsesFor<OperationFor<Paths, Path, "delete">>>,
-    ApiFailure<ResponsesFor<OperationFor<Paths, Path, "delete">>>,
-    HttpClient.HttpClient
-  >
-
-  /**
-   * Execute PATCH request
-   */
-  readonly PATCH: <Path extends PathsForMethod<Paths, "patch">>(
-    path: Path,
-    dispatcher: Dispatcher<ResponsesFor<OperationFor<Paths, Path, "patch">>>,
-    options?: RequestOptionsFor<OperationFor<Paths, Path, "patch">>
-  ) => Effect.Effect<
-    ApiSuccess<ResponsesFor<OperationFor<Paths, Path, "patch">>>,
-    ApiFailure<ResponsesFor<OperationFor<Paths, Path, "patch">>>,
-    HttpClient.HttpClient
-  >
-
-  /**
-   * Execute HEAD request
-   */
-  readonly HEAD: <Path extends PathsForMethod<Paths, "head">>(
-    path: Path,
-    dispatcher: Dispatcher<ResponsesFor<OperationFor<Paths, Path, "head">>>,
-    options?: RequestOptionsFor<OperationFor<Paths, Path, "head">>
-  ) => Effect.Effect<
-    ApiSuccess<ResponsesFor<OperationFor<Paths, Path, "head">>>,
-    ApiFailure<ResponsesFor<OperationFor<Paths, Path, "head">>>,
-    HttpClient.HttpClient
-  >
-
-  /**
-   * Execute OPTIONS request
-   */
-  readonly OPTIONS: <Path extends PathsForMethod<Paths, "options">>(
-    path: Path,
-    dispatcher: Dispatcher<ResponsesFor<OperationFor<Paths, Path, "options">>>,
-    options?: RequestOptionsFor<OperationFor<Paths, Path, "options">>
-  ) => Effect.Effect<
-    ApiSuccess<ResponsesFor<OperationFor<Paths, Path, "options">>>,
-    ApiFailure<ResponsesFor<OperationFor<Paths, Path, "options">>>,
-    HttpClient.HttpClient
-  >
+/**
+ * Resolve default dispatcher map or fail fast
+ *
+ * @pure false - reads module-level registry
+ * @invariant defaultDispatchers must be set for auto-dispatching client
+ */
+const resolveDefaultDispatchers = <Paths extends object>(): DispatchersFor<Paths> => {
+  if (defaultDispatchers === undefined) {
+    throw new Error("Default dispatchers are not registered. Import generated dispatchers module.")
+  }
+  return asDispatchersFor<DispatchersFor<Paths>>(defaultDispatchers)
 }
 
 /**
@@ -282,11 +193,11 @@ const mergeHeaders = (
  * @pure true - type alias only
  */
 type MethodHandlerOptions = {
-  params?: Record<string, ParamValue>
-  query?: Record<string, QueryValue>
-  body?: BodyInit | object
-  headers?: HeadersInit
-  signal?: AbortSignal
+  params?: Record<string, ParamValue> | undefined
+  query?: Record<string, QueryValue> | undefined
+  body?: BodyInit | object | undefined
+  headers?: HeadersInit | undefined
+  signal?: AbortSignal | undefined
 }
 
 /**
@@ -329,6 +240,37 @@ const createMethodHandler = (
 }
 
 /**
+ * Create method handler that infers dispatcher from map
+ *
+ * @pure false - creates function that performs HTTP requests
+ * @complexity O(1) handler creation
+ */
+const createMethodHandlerWithDispatchers = <Paths extends object, Method extends HttpMethod>(
+  method: Method,
+  clientOptions: ClientOptions,
+  dispatchers: DispatchersForMethod<Paths, Method>
+) =>
+<Path extends keyof DispatchersForMethod<Paths, Method> & string>(
+  path: Path,
+  options?: MethodHandlerOptions
+) =>
+  createMethodHandler(method, clientOptions)(
+    path,
+    dispatchers[path][method],
+    options
+  )
+
+// CHANGE: Create method handler that infers dispatcher from map
+// WHY: Allow per-call API without passing dispatcher parameter
+// QUOTE(ТЗ): "Зачем передавать что либо в GET"
+// REF: user-msg-1
+// SOURCE: n/a
+// FORMAT THEOREM: ∀ path ∈ PathsForMethod<Paths, method>: dispatchers[path][method] = Dispatcher<ResponsesFor<Op>>
+// PURITY: SHELL
+// EFFECT: Effect<ApiSuccess<Responses>, ApiFailure<Responses>, HttpClient>
+// INVARIANT: Dispatcher lookup is total for all operations in Paths
+// COMPLEXITY: O(1) runtime + O(1) dispatcher lookup
+/**
  * Create type-safe Effect-based API client
  *
  * The client enforces:
@@ -349,34 +291,35 @@ const createMethodHandler = (
  * ```typescript
  * import createClient from "openapi-effect"
  * import type { Paths } from "./generated/schema"
- * import { dispatchergetPet } from "./generated/dispatch"
+ * import "./generated/dispatchers-by-path" // registers default dispatchers
  *
  * const client = createClient<Paths>({
  *   baseUrl: "https://api.example.com",
  *   credentials: "include"
  * })
  *
- * // Type-safe call - path must have "get", dispatcher must match
- * const result = yield* client.GET("/pets/{petId}", dispatchergetPet, {
+ * // Type-safe call - dispatcher inferred from path+method
+ * const result = yield* client.GET("/pets/{petId}", {
  *   params: { petId: "123" }  // Required because getPet has path params
  * })
  *
  * // Compile error: "/pets/{petId}" has no "put" method
  * // client.PUT("/pets/{petId}", ...) // Type error!
- *
- * // Compile error: wrong dispatcher for path
- * // client.GET("/pets/{petId}", dispatcherlistPets, ...) // Type error!
  * ```
  */
 export const createClient = <Paths extends object>(
-  options: ClientOptions
-): StrictApiClient<Paths> =>
-  asStrictApiClient<StrictApiClient<Paths>>({
-    GET: createMethodHandler("get", options),
-    POST: createMethodHandler("post", options),
-    PUT: createMethodHandler("put", options),
-    DELETE: createMethodHandler("delete", options),
-    PATCH: createMethodHandler("patch", options),
-    HEAD: createMethodHandler("head", options),
-    OPTIONS: createMethodHandler("options", options)
+  options: ClientOptions,
+  dispatchers?: DispatchersFor<Paths>
+): StrictApiClientWithDispatchers<Paths> => {
+  const resolvedDispatchers = dispatchers ?? resolveDefaultDispatchers<Paths>()
+
+  return asStrictApiClient<StrictApiClientWithDispatchers<Paths>>({
+    GET: createMethodHandlerWithDispatchers("get", options, resolvedDispatchers),
+    POST: createMethodHandlerWithDispatchers("post", options, resolvedDispatchers),
+    PUT: createMethodHandlerWithDispatchers("put", options, resolvedDispatchers),
+    DELETE: createMethodHandlerWithDispatchers("delete", options, resolvedDispatchers),
+    PATCH: createMethodHandlerWithDispatchers("patch", options, resolvedDispatchers),
+    HEAD: createMethodHandlerWithDispatchers("head", options, resolvedDispatchers),
+    OPTIONS: createMethodHandlerWithDispatchers("options", options, resolvedDispatchers)
   })
+}

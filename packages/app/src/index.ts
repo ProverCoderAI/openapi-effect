@@ -8,7 +8,13 @@
 
 // High-level API (recommended for most users)
 export { createClient as default } from "./shell/api-client/create-client.js"
-export type { ClientOptions, StrictApiClient } from "./shell/api-client/create-client.js"
+export type {
+  ClientOptions,
+  DispatchersFor,
+  StrictApiClient,
+  StrictApiClientWithDispatchers
+} from "./shell/api-client/create-client.js"
+export { registerDefaultDispatchers } from "./shell/api-client/create-client.js"
 
 // Core types (for advanced type manipulation)
 // Effect Channel Design:

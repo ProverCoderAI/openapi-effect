@@ -133,3 +133,11 @@ export type ClassifyFn = (
  * @pure true
  */
 export const asStrictApiClient = <T>(client: object): T => client as T
+
+/**
+ * Cast default dispatchers registry to specific schema type
+ * AXIOM: Default dispatcher registry was registered for the current Paths type
+ *
+ * @pure true
+ */
+export const asDispatchersFor = <T>(value: unknown): T => value as T
