@@ -341,7 +341,18 @@ export default defineConfig(
     },
   },
 
-  // 5) Для JS-файлов отключим типо-зависимые проверки
+  // 5) Generated OpenAPI schema uses canonical lowercase names from openapi-typescript
+  {
+    files: ["src/core/api/openapi.d.ts"],
+    rules: {
+      "sonarjs/class-name": "off",
+      "max-lines": "off",
+      "max-lines-per-function": "off",
+      "complexity": "off",
+    },
+  },
+
+  // 6) Для JS-файлов отключим типо-зависимые проверки
   {
     files: ['**/*.{js,cjs,mjs}'],
     extends: [tseslint.configs.disableTypeChecked],

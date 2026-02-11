@@ -12,7 +12,8 @@
 		"**/fixtures/**",
 		"**/tests/api-client/**",
 		"**/src/shell/api-client/create-client.ts",
-		"**/src/index.ts"
+		"**/src/index.ts",
+    "**/src/core/api/openapi.d.ts"
 	],
 	"skipComments": true,
 	"ignorePattern": [
