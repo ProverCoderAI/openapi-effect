@@ -52,7 +52,7 @@
     "@effect/typeclass": "^0.38.0",
     "@effect/workflow": "^0.16.0",
     "effect": "^3.19.16",
-    "openapi-typescript-helpers": "^0.0.15",
+    "openapi-typescript-helpers": "^0.1.0",
     "ts-morph": "^27.0.2"
   },
   "devDependencies": {
@@ -64,7 +64,7 @@
     "@eslint/compat": "2.0.2",
     "@eslint/eslintrc": "3.3.3",
     "@eslint/js": "10.0.1",
-    "@prover-coder-ai/eslint-plugin-suggest-members": "^0.0.23",
+    "@prover-coder-ai/eslint-plugin-suggest-members": "^0.0.24",
     "@ton-ai-core/vibecode-linter": "^1.0.11",
     "@types/node": "^24.10.13",
     "@typescript-eslint/eslint-plugin": "^8.55.0",
@@ -84,7 +84,7 @@
     "jscpd": "^4.0.8",
     "typescript": "^5.9.3",
     "vite": "^7.3.1",
-    "vite-tsconfig-paths": "^6.1.0",
+    "vite-tsconfig-paths": "^6.1.1",
     "vitest": "^4.0.18"
   }
 }
