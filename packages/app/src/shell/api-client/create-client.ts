@@ -353,7 +353,9 @@ const createMethodHandlerWithUniversalDispatcher = (
     options
   )
 
-const isHttpErrorValue = (error: unknown): error is { readonly _tag: "HttpError" } =>
+type HttpErrorTag = { readonly _tag: "HttpError" }
+
+const isHttpErrorValue = (error: unknown): error is HttpErrorTag =>
   typeof error === "object"
   && error !== null
   && "_tag" in error
@@ -361,9 +363,16 @@ const isHttpErrorValue = (error: unknown): error is { readonly _tag: "HttpError"
 
 const exposeHttpErrorsAsValues = <A, E>(
   request: Effect.Effect<A, E, HttpClient.HttpClient>
-): Effect.Effect<A | { readonly _tag: "HttpError" }, E, HttpClient.HttpClient> =>
+): Effect.Effect<
+  A | Extract<E, HttpErrorTag>,
+  Exclude<E, Extract<E, HttpErrorTag>>,
+  HttpClient.HttpClient
+> =>
   request.pipe(
-    Effect.catchIf(isHttpErrorValue, (error) => Effect.succeed(error))
+    Effect.catchIf(
+      (error): error is Extract<E, HttpErrorTag> => isHttpErrorValue(error),
+      (error) => Effect.succeed(error)
+    )
   )
 
 const createMethodHandlerWithUniversalDispatcherValue = (
