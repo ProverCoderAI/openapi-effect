@@ -344,7 +344,7 @@ export default defineConfig(
   // 5) openapi-fetch compatibility layer: Promise-based types and pragmatic "any" are expected.
   // It is intentionally treated as a boundary/interop module.
   {
-    files: ["src/openapi-fetch/**/*.ts"],
+    files: ["src/shell/api-client/openapi-fetch-compat/**/*.ts"],
     rules: {
       "no-restricted-syntax": "off",
       "@typescript-eslint/no-restricted-types": "off",

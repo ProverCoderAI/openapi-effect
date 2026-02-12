@@ -247,6 +247,6 @@ export default tseslint.config(
   },
   {
     name: "effect-ts-compliance-ignores",
-    ignores: ["src/openapi-fetch/**"]
+    ignores: ["src/shell/api-client/openapi-fetch-compat/**"]
   }
 )
