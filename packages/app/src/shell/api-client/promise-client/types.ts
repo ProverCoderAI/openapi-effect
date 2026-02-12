@@ -1,12 +1,11 @@
-// CHANGE: Local openapi-fetch compatible types (no dependency on openapi-fetch package)
-// WHY: openapi-effect must be a drop-in replacement for openapi-fetch without pulling it as a dependency
-// SOURCE: API surface is compatible with openapi-fetch@0.15.x (MIT)
+// CHANGE: Promise-client compatibility types without dependency on openapi-fetch
+// WHY: Keep drop-in public signatures while preserving repo lint constraints
+// SOURCE: API shape is compatible with openapi-fetch@0.15.x (MIT)
 // PURITY: CORE (types only)
 // COMPLEXITY: O(1)
 
 import type {
   ErrorResponse,
-  FilterKeys,
   HttpMethod,
   IsOperationRequestBodyOptional,
   MediaType,
@@ -22,7 +21,7 @@ export interface ClientOptions extends Omit<RequestInit, "headers"> {
   /** set the common root URL for all API requests */
   baseUrl?: string
   /** custom fetch (defaults to globalThis.fetch) */
-  fetch?: (input: Request) => Promise<Response>
+  fetch?: (input: Request) => globalThis.Promise<Response>
   /** custom Request (defaults to globalThis.Request) */
   Request?: typeof Request
   /** global querySerializer */
@@ -47,7 +46,8 @@ export type HeadersOptions =
   >
 
 export type QuerySerializer<T> = (
-  query: T extends { parameters: any } ? NonNullable<T["parameters"]["query"]> : Record<string, unknown>
+  query: T extends { parameters: Record<string, unknown> } ? NonNullable<T["parameters"]["query"]>
+    : Record<string, unknown>
 ) => string
 
 /** @see https://swagger.io/docs/specification/serialization/#query */
@@ -76,7 +76,10 @@ export type QuerySerializerOptions = {
   allowReserved?: boolean
 }
 
-export type BodySerializer<T> = (body: OperationRequestBodyContent<T>) => any
+export type BodySerializer<T> = (
+  body: OperationRequestBodyContent<T>,
+  headers?: Headers | Record<string, string>
+) => unknown
 
 type BodyType<T = unknown> = {
   json: T
@@ -97,7 +100,7 @@ export interface DefaultParamsOption {
   }
 }
 
-export type ParamsOption<T> = T extends { parameters: any }
+export type ParamsOption<T> = T extends { parameters: Record<string, unknown> }
   ? RequiredKeysOf<T["parameters"]> extends never ? { params?: T["parameters"] }
   : { params: T["parameters"] }
   : DefaultParamsOption
@@ -116,13 +119,13 @@ export type RequestOptions<T> =
     parseAs?: ParseAs
     fetch?: ClientOptions["fetch"]
     headers?: HeadersOptions
-    middleware?: Array<Middleware>
+    middleware?: ReadonlyArray<Middleware>
   }
 
 export type FetchOptions<T> = RequestOptions<T> & Omit<RequestInit, "body" | "headers">
 
 export type FetchResponse<
-  T extends Record<string | number, any>,
+  T extends Record<string | number, unknown>,
   Options,
   Media extends MediaType
 > =
@@ -165,15 +168,26 @@ export interface MiddlewareCallbackParams {
 
 export type MiddlewareOnRequest = (
   options: MiddlewareCallbackParams
-) => void | Request | Response | undefined | Promise<Request | Response | undefined | void>
+) =>
+  | Request
+  | Response
+  | undefined
+  | globalThis.Promise<Request | Response | undefined>
 
 export type MiddlewareOnResponse = (
   options: MiddlewareCallbackParams & { response: Response }
-) => void | Response | undefined | Promise<Response | undefined | void>
+) =>
+  | Response
+  | undefined
+  | globalThis.Promise<Response | undefined>
 
 export type MiddlewareOnError = (
   options: MiddlewareCallbackParams & { error: unknown }
-) => void | Response | Error | Promise<void | Response | Error>
+) =>
+  | Response
+  | Error
+  | undefined
+  | globalThis.Promise<undefined | Response | Error>
 
 export type Middleware =
   | {
@@ -192,32 +206,38 @@ export type Middleware =
     onError: MiddlewareOnError
   }
 
-/** This type helper makes the 2nd function param required if params/requestBody are required; otherwise, optional */
-export type MaybeOptionalInit<Params, Location extends keyof Params> =
-  RequiredKeysOf<FetchOptions<FilterKeys<Params, Location>>> extends never
-    ? FetchOptions<FilterKeys<Params, Location>> | undefined
-    : FetchOptions<FilterKeys<Params, Location>>
+type OperationForLocation<Params, Location extends PropertyKey> = Params extends Record<Location, infer Operation>
+  ? Operation
+  : never
+
+type OperationForPathMethod<
+  Paths extends object,
+  Path extends keyof Paths,
+  Method extends HttpMethod
+> = OperationForLocation<Paths[Path], Method> & Record<string | number, unknown>
+
+/** 2nd param is required only when params/requestBody are required */
+export type MaybeOptionalInit<Params, Location extends PropertyKey> =
+  RequiredKeysOf<FetchOptions<OperationForLocation<Params, Location>>> extends never
+    ? FetchOptions<OperationForLocation<Params, Location>> | undefined
+    : FetchOptions<OperationForLocation<Params, Location>>
 
 // The final init param to accept.
 // - Determines if the param is optional or not.
 // - Performs arbitrary [key: string] addition.
-// Note: the addition MUST happen after all the inference happens (otherwise TS can't infer if init is required or not).
-export type InitParam<Init> = RequiredKeysOf<Init> extends never ? [(Init & { [key: string]: unknown })?]
-  : [Init & { [key: string]: unknown }]
+// Note: the addition MUST happen after all inference happens.
+export type InitParam<Init> = RequiredKeysOf<Init> extends never ? [(Init & Record<string, unknown>)?]
+  : [Init & Record<string, unknown>]
 
-export type ClientMethod<
-  Paths extends Record<string, Record<HttpMethod, {}>>,
-  Method extends HttpMethod,
-  Media extends MediaType
-> = <Path extends PathsWithMethod<Paths, Method>, Init extends MaybeOptionalInit<Paths[Path], Method>>(
+export type ClientMethod<Paths extends object, Method extends HttpMethod, Media extends MediaType> = <
+  Path extends PathsWithMethod<Paths, Method>,
+  Init extends MaybeOptionalInit<Paths[Path], Method>
+>(
   url: Path,
   ...init: InitParam<Init>
-) => Promise<FetchResponse<Paths[Path][Method], Init, Media>>
+) => globalThis.Promise<FetchResponse<OperationForPathMethod<Paths, Path, Method>, Init, Media>>
 
-export type ClientRequestMethod<
-  Paths extends Record<string, Record<HttpMethod, {}>>,
-  Media extends MediaType
-> = <
+export type ClientRequestMethod<Paths extends object, Media extends MediaType> = <
   Method extends HttpMethod,
   Path extends PathsWithMethod<Paths, Method>,
   Init extends MaybeOptionalInit<Paths[Path], Method>
@@ -225,15 +245,15 @@ export type ClientRequestMethod<
   method: Method,
   url: Path,
   ...init: InitParam<Init>
-) => Promise<FetchResponse<Paths[Path][Method], Init, Media>>
+) => globalThis.Promise<FetchResponse<OperationForPathMethod<Paths, Path, Method>, Init, Media>>
 
-export type ClientForPath<PathInfo extends Record<string | number, any>, Media extends MediaType> = {
+export type ClientForPath<PathInfo extends Record<string | number, unknown>, Media extends MediaType> = {
   [Method in keyof PathInfo as Uppercase<string & Method>]: <Init extends MaybeOptionalInit<PathInfo, Method>>(
     ...init: InitParam<Init>
-  ) => Promise<FetchResponse<PathInfo[Method], Init, Media>>
+  ) => globalThis.Promise<FetchResponse<PathInfo[Method] & Record<string | number, unknown>, Init, Media>>
 }
 
-export interface Client<Paths extends {}, Media extends MediaType = MediaType> {
+export interface Client<Paths extends object, Media extends MediaType = MediaType> {
   request: ClientRequestMethod<Paths, Media>
   /** Call a GET endpoint */
   GET: ClientMethod<Paths, "get", Media>
@@ -252,25 +272,24 @@ export interface Client<Paths extends {}, Media extends MediaType = MediaType> {
   /** Call a TRACE endpoint */
   TRACE: ClientMethod<Paths, "trace", Media>
   /** Register middleware */
-  use(...middleware: Array<Middleware>): void
+  use(...middleware: ReadonlyArray<Middleware>): void
   /** Unregister middleware */
-  eject(...middleware: Array<Middleware>): void
+  eject(...middleware: ReadonlyArray<Middleware>): void
 }
 
-export type ClientPathsWithMethod<
-  CreatedClient extends Client<any, any>,
-  Method extends HttpMethod
-> = CreatedClient extends Client<infer Paths, infer _Media> ? PathsWithMethod<Paths, Method> : never
+export type ClientPathsWithMethod<CreatedClient extends Client<object>, Method extends HttpMethod> =
+  CreatedClient extends Client<infer Paths, infer _Media> ? PathsWithMethod<Paths, Method>
+    : never
 
 export type MethodResponse<
-  CreatedClient extends Client<any, any>,
+  CreatedClient extends Client<object>,
   Method extends HttpMethod,
   Path extends ClientPathsWithMethod<CreatedClient, Method>,
-  Options = {}
-> = CreatedClient extends Client<infer Paths extends { [key: string]: any }, infer Media extends MediaType>
-  ? NonNullable<FetchResponse<Paths[Path][Method], Options, Media>["data"]>
+  Options = object
+> = CreatedClient extends Client<infer Paths, infer Media extends MediaType>
+  ? NonNullable<FetchResponse<OperationForPathMethod<Paths, Path, Method>, Options, Media>["data"]>
   : never
 
-export type PathBasedClient<Paths extends {}, Media extends MediaType = MediaType> = {
-  [Path in keyof Paths]: ClientForPath<Paths[Path] & Record<string | number, any>, Media>
+export type PathBasedClient<Paths extends object, Media extends MediaType = MediaType> = {
+  [Path in keyof Paths]: ClientForPath<Paths[Path] & Record<string | number, unknown>, Media>
 }

@@ -22,7 +22,7 @@ import type {
   ResponsesFor
 } from "../../core/api-client/strict-types.js"
 import type { Dispatcher } from "../../core/axioms.js"
-import type { ClientOptions as OpenapiFetchClientOptions } from "./openapi-fetch-compat/types.js"
+import type { ClientOptions as OpenapiFetchClientOptions } from "./promise-client/types.js"
 
 /**
  * Client configuration options
