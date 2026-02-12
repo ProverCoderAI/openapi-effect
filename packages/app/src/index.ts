@@ -14,7 +14,7 @@ export type {
   StrictApiClient,
   StrictApiClientWithDispatchers
 } from "./shell/api-client/create-client.js"
-export { registerDefaultDispatchers } from "./shell/api-client/create-client.js"
+export { createClientEffect, registerDefaultDispatchers } from "./shell/api-client/create-client.js"
 
 // Core types (for advanced type manipulation)
 // Effect Channel Design:
@@ -48,6 +48,7 @@ export type { Decoder, Dispatcher, RawResponse, StrictClient, StrictRequestInit 
 export {
   createDispatcher,
   createStrictClient,
+  createUniversalDispatcher,
   executeRequest,
   parseJSON,
   unexpectedContentType,
