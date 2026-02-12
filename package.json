@@ -8,18 +8,18 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "pnpm --filter openapi-effect build",
-    "check": "pnpm --filter openapi-effect check",
+    "build": "pnpm --filter @prover-coder-ai/openapi-effect build",
+    "check": "pnpm --filter @prover-coder-ai/openapi-effect check",
     "changeset": "changeset",
     "changeset-publish": "node -e \"if (!process.env.NPM_TOKEN) { console.log('Skipping publish: NPM_TOKEN is not set'); process.exit(0); }\" && changeset publish",
     "changeset-version": "changeset version",
-    "dev": "pnpm --filter openapi-effect dev",
-    "lint": "pnpm --filter openapi-effect lint",
-    "lint:tests": "pnpm --filter openapi-effect lint:tests",
-    "lint:effect": "pnpm --filter openapi-effect lint:effect",
-    "test": "pnpm --filter openapi-effect test",
-    "typecheck": "pnpm --filter openapi-effect typecheck",
-    "start": "pnpm --filter openapi-effect start"
+    "dev": "pnpm --filter @prover-coder-ai/openapi-effect dev",
+    "lint": "pnpm --filter @prover-coder-ai/openapi-effect lint",
+    "lint:tests": "pnpm --filter @prover-coder-ai/openapi-effect lint:tests",
+    "lint:effect": "pnpm --filter @prover-coder-ai/openapi-effect lint:effect",
+    "test": "pnpm --filter @prover-coder-ai/openapi-effect test",
+    "typecheck": "pnpm --filter @prover-coder-ai/openapi-effect typecheck",
+    "start": "pnpm --filter @prover-coder-ai/openapi-effect start"
   },
   "devDependencies": {
     "@changesets/changelog-github": "^0.5.2",

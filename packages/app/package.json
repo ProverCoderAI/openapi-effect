@@ -1,5 +1,5 @@
 {
-  "name": "openapi-effect",
+  "name": "@prover-coder-ai/openapi-effect",
   "version": "1.0.16",
   "description": "Drop-in replacement for openapi-fetch with an opt-in Effect API",
   "type": "module",
