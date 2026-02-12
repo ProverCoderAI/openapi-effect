@@ -10,6 +10,7 @@
 
 import type * as HttpClient from "@effect/platform/HttpClient"
 import type { Effect } from "effect"
+import type { ClientOptions as OpenapiFetchClientOptions } from "openapi-fetch"
 import type { HttpMethod } from "openapi-typescript-helpers"
 
 import type {
@@ -28,12 +29,7 @@ import type { Dispatcher } from "../../core/axioms.js"
  *
  * @pure - immutable configuration
  */
-export type ClientOptions = {
-  readonly baseUrl: string
-  readonly credentials?: RequestCredentials
-  readonly headers?: HeadersInit
-  readonly fetch?: typeof globalThis.fetch
-}
+export type ClientOptions = OpenapiFetchClientOptions
 
 // CHANGE: Add dispatcher map type for auto-dispatching clients
 // WHY: Enable creating clients that infer dispatcher from path+method without per-call parameter

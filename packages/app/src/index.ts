@@ -1,57 +1,39 @@
-// CHANGE: Main entry point for openapi-effect package with Effect-native error handling
-// WHY: Enable default import of createClient function with proper error channel design
-// QUOTE(ТЗ): "import createClient from \"openapi-effect\""
-// REF: PR#3 comment from skulidropek about Effect representation
+// CHANGE: Make openapi-effect a drop-in replacement for openapi-fetch (Promise API), with an opt-in Effect API.
+// WHY: Consumer projects must be able to swap openapi-fetch -> openapi-effect with near-zero code changes.
+// QUOTE(ТЗ): "openapi-effect должен почти 1 в 1 заменяться с openapi-fetch" / "Просто добавлять effect поведение"
 // SOURCE: n/a
 // PURITY: SHELL (re-exports)
 // COMPLEXITY: O(1)
 
-// High-level API (recommended for most users)
-export { createClient as default } from "./shell/api-client/create-client.js"
+// Promise-based client (openapi-fetch compatible)
+export { default } from "openapi-fetch"
+export { default as createClient } from "openapi-fetch"
+export * from "openapi-fetch"
+
+// Effect-based client (opt-in)
+export * as FetchHttpClient from "@effect/platform/FetchHttpClient"
+
+// Strict Effect client (advanced)
+export type * from "./core/api-client/index.js"
+export { assertNever } from "./core/api-client/index.js"
+
 export type {
-  ClientEffect,
-  ClientOptions,
   DispatchersFor,
   StrictApiClient,
   StrictApiClientWithDispatchers
 } from "./shell/api-client/create-client.js"
-export { createClientEffect, registerDefaultDispatchers } from "./shell/api-client/create-client.js"
 
-// Core types (for advanced type manipulation)
-// Effect Channel Design:
-// - ApiSuccess<Responses>: 2xx responses → success channel
-// - ApiFailure<Responses>: HttpError (4xx, 5xx) + BoundaryError → error channel
-export type {
-  ApiFailure,
-  ApiSuccess,
-  BodyFor,
-  BoundaryError,
-  ContentTypesFor,
-  DecodeError,
-  HttpError,
-  HttpErrorResponseVariant,
-  HttpErrorVariants,
-  OperationFor,
-  ParseError,
-  PathsForMethod,
-  ResponsesFor,
-  ResponseVariant,
-  StatusCodes,
-  SuccessVariants,
-  TransportError,
-  UnexpectedContentType,
-  UnexpectedStatus
-} from "./core/api-client/index.js"
-
-// Shell utilities (for custom implementations)
 export type { Decoder, Dispatcher, RawResponse, StrictClient, StrictRequestInit } from "./shell/api-client/index.js"
 
 export {
+  createClient as createClientStrict,
+  createClientEffect,
   createDispatcher,
   createStrictClient,
   createUniversalDispatcher,
   executeRequest,
   parseJSON,
+  registerDefaultDispatchers,
   unexpectedContentType,
   unexpectedStatus
 } from "./shell/api-client/index.js"

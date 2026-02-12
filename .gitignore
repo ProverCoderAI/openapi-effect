@@ -8,3 +8,7 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 reports/
+
+# openapi-effect is consumed via git subdir; commit dist so consumers don't need prepare scripts
+!packages/app/dist/
+!packages/app/dist/**
