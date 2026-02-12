@@ -22,14 +22,26 @@ import type {
   ResponsesFor
 } from "../../core/api-client/strict-types.js"
 import type { Dispatcher } from "../../core/axioms.js"
-import type { ClientOptions as OpenapiFetchClientOptions } from "./promise-client/types.js"
+
+export type HeadersOptions =
+  | Required<RequestInit>["headers"]
+  | Record<
+    string,
+    | string
+    | number
+    | boolean
+    | ReadonlyArray<string | number | boolean>
+    | null
+    | undefined
+  >
 
 /**
- * Client configuration options
- *
- * @pure - immutable configuration
+ * Effect client configuration options
  */
-export type ClientOptions = OpenapiFetchClientOptions
+export interface ClientOptions extends Omit<RequestInit, "body" | "headers" | "method"> {
+  readonly baseUrl?: string
+  readonly headers?: HeadersOptions
+}
 
 // CHANGE: Add dispatcher map type for auto-dispatching clients
 // WHY: Enable creating clients that infer dispatcher from path+method without per-call parameter
