@@ -63,7 +63,6 @@
     "@effect/typeclass": "^0.38.0",
     "@effect/workflow": "^0.16.0",
     "effect": "^3.19.16",
-    "openapi-fetch": "^0.15.2",
     "openapi-typescript-helpers": "^0.1.0",
     "ts-morph": "^27.0.2"
   },

@@ -341,7 +341,37 @@ export default defineConfig(
     },
   },
 
-  // 5) Generated OpenAPI schema uses canonical lowercase names from openapi-typescript
+  // 5) openapi-fetch compatibility layer: Promise-based types and pragmatic "any" are expected.
+  // It is intentionally treated as a boundary/interop module.
+  {
+    files: ["src/openapi-fetch/**/*.ts"],
+    rules: {
+      "no-restricted-syntax": "off",
+      "@typescript-eslint/no-restricted-types": "off",
+      "@typescript-eslint/no-empty-object-type": "off",
+      "@typescript-eslint/no-unnecessary-type-parameters": "off",
+      "@typescript-eslint/no-invalid-void-type": "off",
+      "@typescript-eslint/no-unsafe-assignment": "off",
+      "@typescript-eslint/no-unsafe-argument": "off",
+      "@typescript-eslint/no-unsafe-member-access": "off",
+      "@typescript-eslint/no-unsafe-call": "off",
+      "@typescript-eslint/no-unsafe-return": "off",
+      "@typescript-eslint/no-unnecessary-condition": "off",
+      "@typescript-eslint/no-base-to-string": "off",
+      "sonarjs/pseudo-random": "off",
+      "sonarjs/cognitive-complexity": "off",
+      "sonarjs/different-types-comparison": "off",
+      "unicorn/consistent-function-scoping": "off",
+      "unicorn/prefer-string-slice": "off",
+      complexity: "off",
+      "max-lines": "off",
+      "max-lines-per-function": "off",
+      "max-params": "off",
+      "max-depth": "off",
+    },
+  },
+
+  // 6) Generated OpenAPI schema uses canonical lowercase names from openapi-typescript
   {
     files: ["src/core/api/openapi.d.ts"],
     rules: {
@@ -352,12 +382,12 @@ export default defineConfig(
     },
   },
 
-  // 6) Для JS-файлов отключим типо-зависимые проверки
+  // 7) Для JS-файлов отключим типо-зависимые проверки
   {
     files: ['**/*.{js,cjs,mjs}'],
     extends: [tseslint.configs.disableTypeChecked],
   },
 
-  // 6) Глобальные игноры
+  // 8) Глобальные игноры
   { ignores: ['dist/**', 'build/**', 'coverage/**', '**/dist/**'] },
 );

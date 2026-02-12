@@ -6,9 +6,9 @@
 // COMPLEXITY: O(1)
 
 // Promise-based client (openapi-fetch compatible)
-export { default } from "openapi-fetch"
-export { default as createClient } from "openapi-fetch"
-export * from "openapi-fetch"
+export { default } from "./openapi-fetch/index.js"
+export { createClient } from "./openapi-fetch/index.js"
+export * from "./openapi-fetch/index.js"
 
 // Effect-based client (opt-in)
 export * as FetchHttpClient from "@effect/platform/FetchHttpClient"

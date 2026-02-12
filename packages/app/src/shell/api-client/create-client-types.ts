@@ -10,7 +10,6 @@
 
 import type * as HttpClient from "@effect/platform/HttpClient"
 import type { Effect } from "effect"
-import type { ClientOptions as OpenapiFetchClientOptions } from "openapi-fetch"
 import type { HttpMethod } from "openapi-typescript-helpers"
 
 import type {
@@ -23,6 +22,7 @@ import type {
   ResponsesFor
 } from "../../core/api-client/strict-types.js"
 import type { Dispatcher } from "../../core/axioms.js"
+import type { ClientOptions as OpenapiFetchClientOptions } from "../../openapi-fetch/types.js"
 
 /**
  * Client configuration options

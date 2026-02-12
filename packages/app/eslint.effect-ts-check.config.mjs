@@ -244,5 +244,9 @@ export default tseslint.config(
         rule.selector !== "TSAsExpression" && rule.selector !== "TSTypeAssertion"
       )]
     }
+  },
+  {
+    name: "effect-ts-compliance-ignores",
+    ignores: ["src/openapi-fetch/**"]
   }
 )
