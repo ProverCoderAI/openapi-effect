@@ -8,10 +8,13 @@
 // INVARIANT: All operations are type-safe from path → operation → request → response
 // COMPLEXITY: O(1) client creation
 
+import type * as HttpClient from "@effect/platform/HttpClient"
+import { Effect } from "effect"
 import type { HttpMethod } from "openapi-typescript-helpers"
 
 import { asDispatchersFor, asStrictApiClient, asStrictRequestInit, type Dispatcher } from "../../core/axioms.js"
 import type {
+  ClientEffect,
   ClientOptions,
   DispatchersFor,
   DispatchersForMethod,
@@ -21,6 +24,7 @@ import type { StrictRequestInit } from "./strict-client.js"
 import { createUniversalDispatcher, executeRequest } from "./strict-client.js"
 
 export type {
+  ClientEffect,
   ClientOptions,
   DispatchersFor,
   StrictApiClient,
@@ -349,22 +353,57 @@ const createMethodHandlerWithUniversalDispatcher = (
     options
   )
 
+type HttpErrorTag = { readonly _tag: "HttpError" }
+
+const isHttpErrorValue = (error: unknown): error is HttpErrorTag =>
+  typeof error === "object"
+  && error !== null
+  && "_tag" in error
+  && Reflect.get(error, "_tag") === "HttpError"
+
+const exposeHttpErrorsAsValues = <A, E>(
+  request: Effect.Effect<A, E, HttpClient.HttpClient>
+): Effect.Effect<
+  A | Extract<E, HttpErrorTag>,
+  Exclude<E, Extract<E, HttpErrorTag>>,
+  HttpClient.HttpClient
+> =>
+  request.pipe(
+    Effect.catchIf(
+      (error): error is Extract<E, HttpErrorTag> => isHttpErrorValue(error),
+      (error) => Effect.succeed(error)
+    )
+  )
+
+const createMethodHandlerWithUniversalDispatcherValue = (
+  method: HttpMethod,
+  clientOptions: ClientOptions
+) =>
+(
+  path: string,
+  options?: MethodHandlerOptions
+) =>
+  exposeHttpErrorsAsValues(
+    createMethodHandlerWithUniversalDispatcher(method, clientOptions)(path, options)
+  )
+
 // CHANGE: Add createClientEffect — zero-boilerplate Effect-based API client
 // WHY: Enable the user's desired DSL without any generated code or dispatcher setup
 // QUOTE(ТЗ): "const apiClientEffect = createClientEffect<Paths>(clientOptions); apiClientEffect.POST('/api/auth/login', { body: credentials })"
 // REF: issue-5
 // SOURCE: n/a
-// FORMAT THEOREM: ∀ Paths, options: createClientEffect<Paths>(options) → StrictApiClientWithDispatchers<Paths>
+// FORMAT THEOREM: ∀ Paths, options: createClientEffect<Paths>(options) → ClientEffect<Paths>
 // PURITY: SHELL
-// EFFECT: Client methods return Effect<ApiSuccess, ApiFailure, HttpClient>
+// EFFECT: Client methods return Effect<ApiSuccess | HttpError, BoundaryError, HttpClient>
 // INVARIANT: ∀ path, method: path ∈ PathsForMethod<Paths, method> (compile-time) ∧ response classified by status range (runtime)
 // COMPLEXITY: O(1) client creation
 /**
  * Create type-safe Effect-based API client with zero boilerplate
  *
- * Uses a universal dispatcher that classifies responses by HTTP status range:
- * - 2xx → success channel (ApiSuccess)
- * - non-2xx → error channel (HttpError)
+ * Uses a universal dispatcher and exposes HTTP statuses as values:
+ * - 2xx → success value (ApiSuccess)
+ * - non-2xx schema statuses → success value (HttpError with _tag)
+ * - boundary/protocol failures stay in error channel
  * - JSON parsed automatically for application/json content types
  *
  * **No code generation needed.** No dispatcher registry needed.
@@ -398,14 +437,14 @@ const createMethodHandlerWithUniversalDispatcher = (
  */
 export const createClientEffect = <Paths extends object>(
   options: ClientOptions
-): StrictApiClientWithDispatchers<Paths> => {
-  return asStrictApiClient<StrictApiClientWithDispatchers<Paths>>({
-    GET: createMethodHandlerWithUniversalDispatcher("get", options),
-    POST: createMethodHandlerWithUniversalDispatcher("post", options),
-    PUT: createMethodHandlerWithUniversalDispatcher("put", options),
-    DELETE: createMethodHandlerWithUniversalDispatcher("delete", options),
-    PATCH: createMethodHandlerWithUniversalDispatcher("patch", options),
-    HEAD: createMethodHandlerWithUniversalDispatcher("head", options),
-    OPTIONS: createMethodHandlerWithUniversalDispatcher("options", options)
+): ClientEffect<Paths> => {
+  return asStrictApiClient<ClientEffect<Paths>>({
+    GET: createMethodHandlerWithUniversalDispatcherValue("get", options),
+    POST: createMethodHandlerWithUniversalDispatcherValue("post", options),
+    PUT: createMethodHandlerWithUniversalDispatcherValue("put", options),
+    DELETE: createMethodHandlerWithUniversalDispatcherValue("delete", options),
+    PATCH: createMethodHandlerWithUniversalDispatcherValue("patch", options),
+    HEAD: createMethodHandlerWithUniversalDispatcherValue("head", options),
+    OPTIONS: createMethodHandlerWithUniversalDispatcherValue("options", options)
   })
 }

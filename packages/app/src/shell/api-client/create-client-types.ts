@@ -15,6 +15,7 @@ import type { HttpMethod } from "openapi-typescript-helpers"
 import type {
   ApiFailure,
   ApiSuccess,
+  HttpError,
   OperationFor,
   PathsForMethod,
   RequestOptionsFor,
@@ -75,6 +76,20 @@ type RequestEffect<
 > = Effect.Effect<
   ApiSuccess<ResponsesForOperation<Paths, Path, Method>>,
   ApiFailure<ResponsesForOperation<Paths, Path, Method>>,
+  HttpClient.HttpClient
+>
+
+type RequestEffectWithHttpErrorsInSuccess<
+  Paths extends object,
+  Path extends keyof Paths,
+  Method extends HttpMethod
+> = Effect.Effect<
+  | ApiSuccess<ResponsesForOperation<Paths, Path, Method>>
+  | HttpError<ResponsesForOperation<Paths, Path, Method>>,
+  Exclude<
+    ApiFailure<ResponsesForOperation<Paths, Path, Method>>,
+    HttpError<ResponsesForOperation<Paths, Path, Method>>
+  >,
   HttpClient.HttpClient
 >
 
@@ -252,4 +267,48 @@ export type StrictApiClientWithDispatchers<Paths extends object> = {
     path: Path,
     options?: RequestOptionsForOperation<Paths, Path, "options">
   ) => RequestEffect<Paths, Path, "options">
+}
+
+/**
+ * Ergonomic API client where HTTP statuses (2xx + 4xx/5xx from schema)
+ * are returned in the success value channel.
+ *
+ * Boundary/protocol errors remain in the error channel.
+ * This removes the need for `Effect.either` when handling normal HTTP statuses.
+ */
+export type ClientEffect<Paths extends object> = {
+  readonly GET: <Path extends PathsForMethod<Paths, "get">>(
+    path: Path,
+    options?: RequestOptionsForOperation<Paths, Path, "get">
+  ) => RequestEffectWithHttpErrorsInSuccess<Paths, Path, "get">
+
+  readonly POST: <Path extends PathsForMethod<Paths, "post">>(
+    path: Path,
+    options?: RequestOptionsForOperation<Paths, Path, "post">
+  ) => RequestEffectWithHttpErrorsInSuccess<Paths, Path, "post">
+
+  readonly PUT: <Path extends PathsForMethod<Paths, "put">>(
+    path: Path,
+    options?: RequestOptionsForOperation<Paths, Path, "put">
+  ) => RequestEffectWithHttpErrorsInSuccess<Paths, Path, "put">
+
+  readonly DELETE: <Path extends PathsForMethod<Paths, "delete">>(
+    path: Path,
+    options?: RequestOptionsForOperation<Paths, Path, "delete">
+  ) => RequestEffectWithHttpErrorsInSuccess<Paths, Path, "delete">
+
+  readonly PATCH: <Path extends PathsForMethod<Paths, "patch">>(
+    path: Path,
+    options?: RequestOptionsForOperation<Paths, Path, "patch">
+  ) => RequestEffectWithHttpErrorsInSuccess<Paths, Path, "patch">
+
+  readonly HEAD: <Path extends PathsForMethod<Paths, "head">>(
+    path: Path,
+    options?: RequestOptionsForOperation<Paths, Path, "head">
+  ) => RequestEffectWithHttpErrorsInSuccess<Paths, Path, "head">
+
+  readonly OPTIONS: <Path extends PathsForMethod<Paths, "options">>(
+    path: Path,
+    options?: RequestOptionsForOperation<Paths, Path, "options">
+  ) => RequestEffectWithHttpErrorsInSuccess<Paths, Path, "options">
 }

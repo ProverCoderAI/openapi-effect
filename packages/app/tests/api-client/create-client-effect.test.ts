@@ -3,15 +3,15 @@
 // QUOTE(ТЗ): "apiClientEffect.POST('/api/auth/login', { body: credentials }) — Что бы это работало"
 // REF: issue-5
 // SOURCE: n/a
-// FORMAT THEOREM: ∀ op ∈ AuthOperations: createClientEffect<paths>(options).METHOD(path, opts) → Effect<ApiSuccess, ApiFailure, HttpClient>
+// FORMAT THEOREM: ∀ op ∈ AuthOperations: createClientEffect<paths>(options).METHOD(path, opts) → Effect<ApiSuccess | HttpError, BoundaryError, HttpClient>
 // PURITY: SHELL
 // EFFECT: Effect<void, never, never>
-// INVARIANT: 2xx → isRight (success), non-2xx → isLeft (HttpError), transport failure → isLeft (TransportError)
+// INVARIANT: HTTP statuses are returned as values, boundary failures stay in error channel
 // COMPLEXITY: O(1) per test
 
 import * as HttpClient from "@effect/platform/HttpClient"
 import * as HttpClientResponse from "@effect/platform/HttpClientResponse"
-import { Effect, Either, Layer } from "effect"
+import { Effect, Layer } from "effect"
 import { describe, expect, it } from "vitest"
 
 import type { paths } from "../../src/core/api/openapi.js"
@@ -76,86 +76,76 @@ describe("createClientEffect (zero-boilerplate, auth schema)", () => {
         phoneVerified: false
       })
 
-      const result = yield* Effect.either(
-        apiClientEffect.POST("/api/auth/login", { body: credentials }).pipe(
-          Effect.provide(
-            createMockHttpClientLayer(200, { "content-type": "application/json" }, successBody)
-          )
+      const result = yield* apiClientEffect.POST("/api/auth/login", { body: credentials }).pipe(
+        Effect.provide(
+          createMockHttpClientLayer(200, { "content-type": "application/json" }, successBody)
         )
       )
 
-      expect(Either.isRight(result)).toBe(true)
-      if (Either.isRight(result)) {
-        expect(result.right.status).toBe(200)
-        expect(result.right.contentType).toBe("application/json")
-        const body = result.right.body as { id: string; email: string }
-        expect(body.id).toBe("550e8400-e29b-41d4-a716-446655440000")
-        expect(body.email).toBe("user@example.com")
-      }
+      expect("_tag" in result).toBe(false)
+      expect(result.status).toBe(200)
+      expect(result.contentType).toBe("application/json")
+      const body = result.body as { id: string; email: string }
+      expect(body.id).toBe("550e8400-e29b-41d4-a716-446655440000")
+      expect(body.email).toBe("user@example.com")
     }).pipe(Effect.runPromise))
 
-  it("should return HttpError for 401 invalid_credentials", () =>
+  it("should return HttpError value for 401 invalid_credentials", () =>
     Effect.gen(function*() {
       const credentials = fixtures.wrongLoginBody()
       const errorBody = JSON.stringify({ error: "invalid_credentials" })
 
-      const result = yield* Effect.either(
-        apiClientEffect.POST("/api/auth/login", { body: credentials }).pipe(
-          Effect.provide(
-            createMockHttpClientLayer(401, { "content-type": "application/json" }, errorBody)
-          )
+      const result = yield* apiClientEffect.POST("/api/auth/login", { body: credentials }).pipe(
+        Effect.provide(
+          createMockHttpClientLayer(401, { "content-type": "application/json" }, errorBody)
         )
       )
 
-      expect(Either.isLeft(result)).toBe(true)
-      if (Either.isLeft(result)) {
-        expect(result.left).toMatchObject({
+      expect("_tag" in result).toBe(true)
+      if ("_tag" in result) {
+        expect(result).toMatchObject({
           _tag: "HttpError",
           status: 401
         })
-        const left = result.left as { body: { error: string } }
-        expect(left.body.error).toBe("invalid_credentials")
+        const body = result.body as { error: string }
+        expect(body.error).toBe("invalid_credentials")
       }
     }).pipe(Effect.runPromise))
 
-  it("should return HttpError for 400 bad request", () =>
+  it("should return HttpError value for 400 bad request", () =>
     Effect.gen(function*() {
       const credentials = fixtures.loginBody()
       const errorBody = JSON.stringify({ error: "invalid_payload" })
 
-      const result = yield* Effect.either(
-        apiClientEffect.POST("/api/auth/login", { body: credentials }).pipe(
-          Effect.provide(
-            createMockHttpClientLayer(400, { "content-type": "application/json" }, errorBody)
-          )
+      const result = yield* apiClientEffect.POST("/api/auth/login", { body: credentials }).pipe(
+        Effect.provide(
+          createMockHttpClientLayer(400, { "content-type": "application/json" }, errorBody)
         )
       )
 
-      expect(Either.isLeft(result)).toBe(true)
-      if (Either.isLeft(result)) {
-        expect(result.left).toMatchObject({
+      expect("_tag" in result).toBe(true)
+      if ("_tag" in result) {
+        expect(result).toMatchObject({
           _tag: "HttpError",
           status: 400
         })
       }
     }).pipe(Effect.runPromise))
 
-  it("should return HttpError for 500 internal_error", () =>
+  it("should return HttpError value for 500 internal_error", () =>
     Effect.gen(function*() {
       const credentials = fixtures.loginBody()
       const errorBody = JSON.stringify({ error: "internal_error" })
 
-      const result = yield* Effect.either(
-        apiClientEffect.POST("/api/auth/login", { body: credentials }).pipe(
-          Effect.provide(
-            createMockHttpClientLayer(500, { "content-type": "application/json" }, errorBody)
-          )
+      const result = yield* apiClientEffect.POST("/api/auth/login", { body: credentials }).pipe(
+        Effect.provide(
+          createMockHttpClientLayer(500, { "content-type": "application/json" }, errorBody)
         )
       )
 
-      expect(Either.isLeft(result)).toBe(true)
-      if (Either.isLeft(result)) {
-        expect(result.left).toMatchObject({
+      expect("_tag" in result).toBe(true)
+      if ("_tag" in result) {
+        expect(result).toMatchObject({
           _tag: "HttpError",
           status: 500
         })
@@ -164,20 +154,16 @@ describe("createClientEffect (zero-boilerplate, auth schema)", () => {
 
   it("should POST /api/auth/logout and return 204 no-content success", () =>
     Effect.gen(function*() {
-      const result = yield* Effect.either(
-        apiClientEffect.POST("/api/auth/logout").pipe(
-          Effect.provide(
-            createMockHttpClientLayer(204, {}, "")
-          )
+      const result = yield* apiClientEffect.POST("/api/auth/logout").pipe(
+        Effect.provide(
+          createMockHttpClientLayer(204, {}, "")
         )
       )
 
-      expect(Either.isRight(result)).toBe(true)
-      if (Either.isRight(result)) {
-        expect(result.right.status).toBe(204)
-        expect(result.right.contentType).toBe("none")
-        expect(result.right.body).toBeUndefined()
-      }
+      expect("_tag" in result).toBe(false)
+      expect(result.status).toBe(204)
+      expect(result.contentType).toBe("none")
+      expect(result.body).toBeUndefined()
     }).pipe(Effect.runPromise))
 
   it("should GET /api/auth/me and return 200 with user profile", () =>
@@ -199,38 +185,32 @@ describe("createClientEffect (zero-boilerplate, auth schema)", () => {
         workPhone: null
       })
 
-      const result = yield* Effect.either(
-        apiClientEffect.GET("/api/auth/me").pipe(
-          Effect.provide(
-            createMockHttpClientLayer(200, { "content-type": "application/json" }, profileBody)
-          )
+      const result = yield* apiClientEffect.GET("/api/auth/me").pipe(
+        Effect.provide(
+          createMockHttpClientLayer(200, { "content-type": "application/json" }, profileBody)
         )
       )
 
-      expect(Either.isRight(result)).toBe(true)
-      if (Either.isRight(result)) {
-        expect(result.right.status).toBe(200)
-        const body = result.right.body as { email: string; firstName: string }
-        expect(body.email).toBe("user@example.com")
-        expect(body.firstName).toBe("John")
-      }
+      expect("_tag" in result).toBe(false)
+      expect(result.status).toBe(200)
+      const body = result.body as { email: string; firstName: string }
+      expect(body.email).toBe("user@example.com")
+      expect(body.firstName).toBe("John")
     }).pipe(Effect.runPromise))
 
-  it("should GET /api/auth/me and return HttpError for 401 unauthorized", () =>
+  it("should GET /api/auth/me and return HttpError value for 401 unauthorized", () =>
     Effect.gen(function*() {
       const errorBody = JSON.stringify({ error: "unauthorized" })
 
-      const result = yield* Effect.either(
-        apiClientEffect.GET("/api/auth/me").pipe(
-          Effect.provide(
-            createMockHttpClientLayer(401, { "content-type": "application/json" }, errorBody)
-          )
+      const result = yield* apiClientEffect.GET("/api/auth/me").pipe(
+        Effect.provide(
+          createMockHttpClientLayer(401, { "content-type": "application/json" }, errorBody)
         )
       )
 
-      expect(Either.isLeft(result)).toBe(true)
-      if (Either.isLeft(result)) {
-        expect(result.left).toMatchObject({
+      expect("_tag" in result).toBe(true)
+      if ("_tag" in result) {
+        expect(result).toMatchObject({
           _tag: "HttpError",
           status: 401
         })
@@ -248,43 +228,37 @@ describe("createClientEffect (zero-boilerplate, auth schema)", () => {
         profileImageUrl: null
       })
 
-      const result = yield* Effect.either(
-        apiClientEffect.POST("/api/register", { body: registerBody }).pipe(
-          Effect.provide(
-            createMockHttpClientLayer(201, { "content-type": "application/json" }, successBody)
-          )
+      const result = yield* apiClientEffect.POST("/api/register", { body: registerBody }).pipe(
+        Effect.provide(
+          createMockHttpClientLayer(201, { "content-type": "application/json" }, successBody)
         )
       )
 
-      expect(Either.isRight(result)).toBe(true)
-      if (Either.isRight(result)) {
-        expect(result.right.status).toBe(201)
-        const body = result.right.body as { id: string; email: string }
-        expect(body.email).toBe("new@example.com")
-      }
+      expect("_tag" in result).toBe(false)
+      expect(result.status).toBe(201)
+      const body = result.body as { id: string; email: string }
+      expect(body.email).toBe("new@example.com")
     }).pipe(Effect.runPromise))
 
-  it("should POST /api/register and return HttpError for 409 user_exists", () =>
+  it("should POST /api/register and return HttpError value for 409 user_exists", () =>
     Effect.gen(function*() {
       const registerBody = fixtures.registerBody()
       const errorBody = JSON.stringify({ error: "user_exists" })
 
-      const result = yield* Effect.either(
-        apiClientEffect.POST("/api/register", { body: registerBody }).pipe(
-          Effect.provide(
-            createMockHttpClientLayer(409, { "content-type": "application/json" }, errorBody)
-          )
+      const result = yield* apiClientEffect.POST("/api/register", { body: registerBody }).pipe(
+        Effect.provide(
+          createMockHttpClientLayer(409, { "content-type": "application/json" }, errorBody)
         )
       )
 
-      expect(Either.isLeft(result)).toBe(true)
-      if (Either.isLeft(result)) {
-        expect(result.left).toMatchObject({
+      expect("_tag" in result).toBe(true)
+      if ("_tag" in result) {
+        expect(result).toMatchObject({
           _tag: "HttpError",
           status: 409
         })
-        const left = result.left as { body: { error: string } }
-        expect(left.body.error).toBe("user_exists")
+        const body = result.body as { error: string }
+        expect(body.error).toBe("user_exists")
       }
     }).pipe(Effect.runPromise))
 
@@ -292,17 +266,16 @@ describe("createClientEffect (zero-boilerplate, auth schema)", () => {
     Effect.gen(function*() {
       const credentials = fixtures.loginBody()
 
-      const result = yield* Effect.either(
-        apiClientEffect.POST("/api/auth/login", { body: credentials }).pipe(
-          Effect.provide(
-            createMockHttpClientLayer(200, { "content-type": "text/html" }, "<html>error</html>")
-          )
-        )
+      const result = yield* apiClientEffect.POST("/api/auth/login", { body: credentials }).pipe(
+        Effect.provide(
+          createMockHttpClientLayer(200, { "content-type": "text/html" }, "<html>error</html>")
+        ),
+        Effect.catchTag("UnexpectedContentType", (error) => Effect.succeed(error))
       )
 
-      expect(Either.isLeft(result)).toBe(true)
-      if (Either.isLeft(result)) {
-        expect(result.left).toMatchObject({
+      expect("_tag" in result).toBe(true)
+      if ("_tag" in result) {
+        expect(result).toMatchObject({
           _tag: "UnexpectedContentType",
           status: 200
         })
