@@ -83,6 +83,53 @@ const resolveDefaultDispatchers = <Paths extends object>(): DispatchersFor<Paths
   return asDispatchersFor<DispatchersFor<Paths>>(defaultDispatchers)
 }
 
+const applyPathParams = (path: string, params?: Record<string, ParamValue>): string => {
+  if (params === undefined) {
+    return path
+  }
+
+  let url = path
+  for (const [key, value] of Object.entries(params)) {
+    url = url.replace("{" + key + "}", encodeURIComponent(String(value)))
+  }
+  return url
+}
+
+const buildQueryString = (query?: Record<string, QueryValue>): string => {
+  if (query === undefined) {
+    return ""
+  }
+
+  const searchParams = new URLSearchParams()
+  for (const [key, value] of Object.entries(query)) {
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        searchParams.append(key, String(item))
+      }
+      continue
+    }
+    searchParams.set(key, String(value))
+  }
+  return searchParams.toString()
+}
+
+const appendQueryString = (url: string, queryString: string): string => {
+  if (queryString.length === 0) {
+    return url
+  }
+  return url.includes("?") ? url + "&" + queryString : url + "?" + queryString
+}
+
+const withBaseUrl = (baseUrl: string | undefined, url: string): string => {
+  // If baseUrl is not provided, keep a relative URL (browser-friendly)
+  if (baseUrl === undefined || baseUrl === "") {
+    return url
+  }
+
+  // Construct full URL
+  return new URL(url, baseUrl).toString()
+}
+
 /**
  * Build URL with path parameters and query string
  *
@@ -101,41 +148,11 @@ const buildUrl = (
   params?: Record<string, ParamValue>,
   query?: Record<string, QueryValue>
 ): string => {
-  // Replace path parameters
-  let url = path
-  if (params) {
-    for (const [key, value] of Object.entries(params)) {
-      url = url.replace("{" + key + "}", encodeURIComponent(String(value)))
-    }
-  }
-
-  // Add query parameters
-  if (query) {
-    const searchParams = new URLSearchParams()
-    for (const [key, value] of Object.entries(query)) {
-      if (Array.isArray(value)) {
-        for (const item of value) {
-          searchParams.append(key, String(item))
-        }
-      } else {
-        searchParams.set(key, String(value))
-      }
-    }
-    const qs = searchParams.toString()
-    if (qs.length > 0) {
-      url = url.includes("?") ? url + "&" + qs : url + "?" + qs
-    }
-  }
-
-  // If baseUrl isn't provided, keep a relative URL (browser-friendly)
-  if (baseUrl === undefined || baseUrl === "") {
-    return url
-  }
-
-  // Construct full URL
-  return new URL(url, baseUrl).toString()
+  const urlWithParams = applyPathParams(path, params)
+  const queryString = buildQueryString(query)
+  const urlWithQuery = appendQueryString(urlWithParams, queryString)
+  return withBaseUrl(baseUrl, urlWithQuery)
 }
-
 
 /**
  * Check if body is already a BodyInit type (not a plain object needing serialization)
@@ -181,30 +198,18 @@ const needsJsonContentType = (body: BodyInit | object | undefined): boolean =>
   && !(body instanceof Blob)
   && !(body instanceof FormData)
 
-/**
- * Merge headers from client options and request options
- *
- * @pure true
- * @complexity O(n) where n = number of headers
- */
-const toHeaders = (headersInit: ClientOptions["headers"] | undefined): Headers => {
+const toHeadersFromRecord = (
+  headersInit: Record<
+    string,
+    | string
+    | number
+    | boolean
+    | ReadonlyArray<string | number | boolean>
+    | null
+    | undefined
+  >
+): Headers => {
   const headers = new Headers()
-  if (headersInit === undefined) {
-    return headers
-  }
-
-  if (headersInit instanceof Headers) {
-    return new Headers(headersInit)
-  }
-
-  if (Array.isArray(headersInit)) {
-    for (const entry of headersInit) {
-      if (Array.isArray(entry) && entry.length === 2) {
-        headers.set(String(entry[0]), String(entry[1]))
-      }
-    }
-    return headers
-  }
 
   for (const [key, value] of Object.entries(headersInit)) {
     if (value === null || value === undefined) {
@@ -218,6 +223,28 @@ const toHeaders = (headersInit: ClientOptions["headers"] | undefined): Headers =
   }
 
   return headers
+}
+
+/**
+ * Merge headers from client options and request options
+ *
+ * @pure true
+ * @complexity O(n) where n = number of headers
+ */
+const toHeaders = (headersInit: ClientOptions["headers"] | undefined): Headers => {
+  if (headersInit === undefined) {
+    return new Headers()
+  }
+
+  if (headersInit instanceof Headers) {
+    return new Headers(headersInit)
+  }
+
+  if (Array.isArray(headersInit)) {
+    return new Headers(headersInit)
+  }
+
+  return toHeadersFromRecord(headersInit)
 }
 
 const mergeHeaders = (
