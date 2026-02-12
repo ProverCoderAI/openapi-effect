@@ -9,6 +9,7 @@
 // High-level API (recommended for most users)
 export { createClient as default } from "./shell/api-client/create-client.js"
 export type {
+  ClientEffect,
   ClientOptions,
   DispatchersFor,
   StrictApiClient,

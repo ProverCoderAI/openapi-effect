@@ -27,5 +27,11 @@ export {
 } from "./strict-client.js"
 
 // High-level client creation API
-export type { ClientOptions, DispatchersFor, StrictApiClient, StrictApiClientWithDispatchers } from "./create-client.js"
+export type {
+  ClientEffect,
+  ClientOptions,
+  DispatchersFor,
+  StrictApiClient,
+  StrictApiClientWithDispatchers
+} from "./create-client.js"
 export { createClient, createClientEffect, registerDefaultDispatchers } from "./create-client.js"
