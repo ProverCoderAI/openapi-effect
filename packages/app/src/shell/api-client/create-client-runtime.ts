@@ -219,9 +219,11 @@ const executeFetch = (
     const request = requestPhase.request
 
     const response = requestPhase.response ?? (
-      yield* Effect.catchAll(
-        invokeFetch(prepared.fetch, request, prepared.requestInitExt),
-        (fetchError) => applyErrorMiddleware(request, fetchError, prepared.context)
+      yield* invokeFetch(prepared.fetch, request, prepared.requestInitExt).pipe(
+        Effect.matchEffect({
+          onFailure: (fetchError) => applyErrorMiddleware(request, fetchError, prepared.context),
+          onSuccess: (response) => Effect.succeed(response)
+        })
       )
     )
 
