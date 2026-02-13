@@ -80,6 +80,22 @@ const restrictedSyntaxBase = [
     message: "Avoid Promise.*. Use Effect combinators."
   },
   {
+    selector: "CallExpression[callee.object.object.name='globalThis'][callee.object.property.name='Promise']",
+    message: "Avoid globalThis.Promise.*. Use Effect combinators."
+  },
+  {
+    selector: "NewExpression[callee.object.name='globalThis'][callee.property.name='Promise']",
+    message: "Avoid globalThis.Promise. Use Effect.async / Effect.tryPromise."
+  },
+  {
+    selector: "TSTypeReference[typeName.name='Promise'], TSTypeReference[typeName.name='PromiseLike']",
+    message: "Avoid Promise/PromiseLike types. Use Effect.Effect<A, E, R>."
+  },
+  {
+    selector: "TSTypeReference[typeName.type='TSQualifiedName'][typeName.left.name='globalThis'][typeName.right.name='Promise']",
+    message: "Avoid globalThis.Promise type. Use Effect.Effect<A, E, R>."
+  },
+  {
     selector: "CallExpression[callee.name='require']",
     message: "Avoid require(). Use ES module imports."
   },
@@ -178,6 +194,15 @@ export default tseslint.config(
           },
           "Promise<*>": {
             message: "Avoid Promise<T>. Use Effect.Effect<T, E, R>."
+          },
+          PromiseLike: {
+            message: "Avoid PromiseLike<T>. Use Effect.Effect<T, E, R>."
+          },
+          "PromiseLike<*>": {
+            message: "Avoid PromiseLike<T>. Use Effect.Effect<T, E, R>."
+          },
+          "globalThis.Promise": {
+            message: "Avoid globalThis.Promise<T>. Use Effect.Effect<T, E, R>."
           }
         }
       }],

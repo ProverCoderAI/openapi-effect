@@ -1,23 +1,16 @@
-// CHANGE: Make openapi-effect a drop-in replacement for openapi-fetch (Promise API), with an opt-in Effect API.
-// WHY: Consumer projects must be able to swap openapi-fetch -> openapi-effect with near-zero code changes.
-// QUOTE(ТЗ): "openapi-effect должен почти 1 в 1 заменяться с openapi-fetch" / "Просто добавлять effect поведение"
+// CHANGE: Expose Effect-only public API
+// WHY: Enforce Effect-first paradigm and remove Promise-based client surface
 // SOURCE: n/a
 // PURITY: SHELL (re-exports)
 // COMPLEXITY: O(1)
 
-// Promise-based client (openapi-fetch compatible)
-export { default } from "openapi-fetch"
-export { default as createClient } from "openapi-fetch"
-export * from "openapi-fetch"
-
-// Effect-based client (opt-in)
 export * as FetchHttpClient from "@effect/platform/FetchHttpClient"
 
-// Strict Effect client (advanced)
 export type * from "./core/api-client/index.js"
 export { assertNever } from "./core/api-client/index.js"
 
 export type {
+  ClientOptions,
   DispatchersFor,
   StrictApiClient,
   StrictApiClientWithDispatchers
@@ -26,17 +19,29 @@ export type {
 export type { Decoder, Dispatcher, RawResponse, StrictClient, StrictRequestInit } from "./shell/api-client/index.js"
 
 export {
-  createClient as createClientStrict,
+  createClient,
   createClientEffect,
   createDispatcher,
+  createFinalURL,
+  createPathBasedClient,
+  createQuerySerializer,
   createStrictClient,
   createUniversalDispatcher,
+  defaultBodySerializer,
+  defaultPathSerializer,
   executeRequest,
+  mergeHeaders,
   parseJSON,
   registerDefaultDispatchers,
+  removeTrailingSlash,
+  serializeArrayParam,
+  serializeObjectParam,
+  serializePrimitiveParam,
   unexpectedContentType,
   unexpectedStatus
 } from "./shell/api-client/index.js"
+
+export { createClient as default } from "./shell/api-client/index.js"
 
 // Generated dispatchers (auto-generated from OpenAPI schema)
 export * from "./generated/index.js"

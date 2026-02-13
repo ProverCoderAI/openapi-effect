@@ -210,6 +210,26 @@ export default defineConfig(
 						"Запрещены Promise.* — используй комбинаторы Effect (all, forEach, etc.).",
 				},
 				{
+					selector: "CallExpression[callee.object.object.name='globalThis'][callee.object.property.name='Promise']",
+					message:
+						"Запрещены globalThis.Promise.* — используй комбинаторы Effect.",
+				},
+				{
+					selector: "NewExpression[callee.object.name='globalThis'][callee.property.name='Promise']",
+					message:
+						"Запрещён globalThis.Promise — используй Effect.async / Effect.tryPromise.",
+				},
+				{
+					selector: "TSTypeReference[typeName.name='Promise'], TSTypeReference[typeName.name='PromiseLike']",
+					message:
+						"Запрещены Promise/PromiseLike в типах — используй Effect.Effect<A, E, R>.",
+				},
+				{
+					selector: "TSTypeReference[typeName.type='TSQualifiedName'][typeName.left.name='globalThis'][typeName.right.name='Promise']",
+					message:
+						"Запрещён globalThis.Promise в типах — используй Effect.Effect<A, E, R>.",
+				},
+				{
 					selector: "CallExpression[callee.property.name='push'] > SpreadElement.arguments",
 					message: "Do not use spread arguments in Array.push",
 				},
@@ -231,6 +251,18 @@ export default defineConfig(
 							message:
 								"Запрещён Promise<T> — используй Effect.Effect<T, E, R>.",
 							suggest: ["Effect.Effect<T, E, R>"],
+						},
+						PromiseLike: {
+							message:
+								"Запрещён PromiseLike<T> — используй Effect.Effect<T, E, R>.",
+						},
+						"PromiseLike<*>": {
+							message:
+								"Запрещён PromiseLike<T> — используй Effect.Effect<T, E, R>.",
+						},
+						"globalThis.Promise": {
+							message:
+								"Запрещён globalThis.Promise<T> — используй Effect.Effect<T, E, R>.",
 						},
 					},
 				},
@@ -312,6 +344,30 @@ export default defineConfig(
           selector: 'CallExpression[callee.name="require"]',
           message: "Avoid using require(). Use ES6 imports instead.",
         },
+        {
+          selector: "NewExpression[callee.name='Promise']",
+          message: "Запрещён new Promise — используй Effect.async / Effect.tryPromise.",
+        },
+        {
+          selector: "CallExpression[callee.object.name='Promise']",
+          message: "Запрещены Promise.* — используй комбинаторы Effect.",
+        },
+        {
+          selector: "CallExpression[callee.object.object.name='globalThis'][callee.object.property.name='Promise']",
+          message: "Запрещены globalThis.Promise.* — используй комбинаторы Effect.",
+        },
+        {
+          selector: "NewExpression[callee.object.name='globalThis'][callee.property.name='Promise']",
+          message: "Запрещён globalThis.Promise — используй Effect.async / Effect.tryPromise.",
+        },
+        {
+          selector: "TSTypeReference[typeName.name='Promise'], TSTypeReference[typeName.name='PromiseLike']",
+          message: "Запрещены Promise/PromiseLike в типах — используй Effect.Effect<A, E, R>.",
+        },
+        {
+          selector: "TSTypeReference[typeName.type='TSQualifiedName'][typeName.left.name='globalThis'][typeName.right.name='Promise']",
+          message: "Запрещён globalThis.Promise в типах — используй Effect.Effect<A, E, R>.",
+        },
       ],
       '@typescript-eslint/no-restricted-types': 'off',
       // Axiom type casting functions intentionally use single-use type parameters
@@ -336,6 +392,30 @@ export default defineConfig(
           selector: 'CallExpression[callee.name="require"]',
           message: "Avoid using require(). Use ES6 imports instead.",
         },
+        {
+          selector: "NewExpression[callee.name='Promise']",
+          message: "Запрещён new Promise — используй Effect.async / Effect.tryPromise.",
+        },
+        {
+          selector: "CallExpression[callee.object.name='Promise']",
+          message: "Запрещены Promise.* — используй комбинаторы Effect.",
+        },
+        {
+          selector: "CallExpression[callee.object.object.name='globalThis'][callee.object.property.name='Promise']",
+          message: "Запрещены globalThis.Promise.* — используй комбинаторы Effect.",
+        },
+        {
+          selector: "NewExpression[callee.object.name='globalThis'][callee.property.name='Promise']",
+          message: "Запрещён globalThis.Promise — используй Effect.async / Effect.tryPromise.",
+        },
+        {
+          selector: "TSTypeReference[typeName.name='Promise'], TSTypeReference[typeName.name='PromiseLike']",
+          message: "Запрещены Promise/PromiseLike в типах — используй Effect.Effect<A, E, R>.",
+        },
+        {
+          selector: "TSTypeReference[typeName.type='TSQualifiedName'][typeName.left.name='globalThis'][typeName.right.name='Promise']",
+          message: "Запрещён globalThis.Promise в типах — используй Effect.Effect<A, E, R>.",
+        },
       ],
       '@typescript-eslint/no-restricted-types': 'off',
     },
@@ -358,6 +438,6 @@ export default defineConfig(
     extends: [tseslint.configs.disableTypeChecked],
   },
 
-  // 6) Глобальные игноры
+  // 7) Глобальные игноры
   { ignores: ['dist/**', 'build/**', 'coverage/**', '**/dist/**'] },
 );

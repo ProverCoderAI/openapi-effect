@@ -10,7 +10,7 @@ pnpm add @prover-coder-ai/openapi-effect
 
 ## Usage (Promise API)
 
-This package re-exports `openapi-fetch`, so most code can be migrated by changing only the import.
+This package implements an `openapi-fetch` compatible API, so most code can be migrated by changing only the import.
 
 ```ts
 import createClient from "@prover-coder-ai/openapi-effect"
