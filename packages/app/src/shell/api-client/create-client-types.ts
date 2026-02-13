@@ -1,322 +1,302 @@
-// CHANGE: Extract public createClient types into dedicated module
-// WHY: Keep create-client.ts under lint max-lines without weakening type-level invariants
-// QUOTE(ТЗ): "Только прогони по всему проекту линтеры"
-// REF: user-msg-2
-// SOURCE: n/a
-// PURITY: CORE
-// EFFECT: none
-// INVARIANT: All type-level correlations remain unchanged
-// COMPLEXITY: O(1) compile-time / O(0) runtime
-
-import type * as HttpClient from "@effect/platform/HttpClient"
 import type { Effect } from "effect"
-import type { HttpMethod } from "openapi-typescript-helpers"
-
 import type {
-  ApiFailure,
-  ApiSuccess,
-  HttpError,
-  OperationFor,
-  PathsForMethod,
-  RequestOptionsFor,
-  ResponsesFor
-} from "../../core/api-client/strict-types.js"
-import type { Dispatcher } from "../../core/axioms.js"
+  ErrorResponse,
+  FilterKeys,
+  HttpMethod,
+  IsOperationRequestBodyOptional,
+  MediaType,
+  OperationRequestBodyContent,
+  PathsWithMethod,
+  Readable,
+  RequiredKeysOf,
+  ResponseObjectMap,
+  SuccessResponse,
+  Writable
+} from "openapi-typescript-helpers"
+
+export interface ClientOptions extends Omit<RequestInit, "headers"> {
+  baseUrl?: string
+  fetch?: (input: Request) => ReturnType<typeof globalThis.fetch>
+  Request?: typeof Request
+  querySerializer?: QuerySerializer<unknown> | QuerySerializerOptions
+  bodySerializer?: BodySerializer<unknown>
+  pathSerializer?: PathSerializer
+  headers?: HeadersOptions
+  requestInitExt?: Record<string, unknown>
+}
 
 export type HeadersOptions =
   | Required<RequestInit>["headers"]
   | Record<
     string,
-    | string
-    | number
-    | boolean
-    | ReadonlyArray<string | number | boolean>
-    | null
-    | undefined
+    string | number | boolean | Array<string | number | boolean> | null | undefined
   >
 
-/**
- * Effect client configuration options
- */
-export interface ClientOptions extends Omit<RequestInit, "body" | "headers" | "method"> {
-  readonly baseUrl?: string
-  readonly headers?: HeadersOptions
+export type QuerySerializer<T> = (
+  query: T extends { parameters: infer Parameters } ? Parameters extends { query?: infer Query } ? NonNullable<Query>
+    : Record<string, unknown>
+    : Record<string, unknown>
+) => string
+
+export type QuerySerializerOptions = {
+  array?: {
+    style: "form" | "spaceDelimited" | "pipeDelimited"
+    explode: boolean
+  }
+  object?: {
+    style: "form" | "deepObject"
+    explode: boolean
+  }
+  allowReserved?: boolean
 }
 
-// CHANGE: Add dispatcher map type for auto-dispatching clients
-// WHY: Enable creating clients that infer dispatcher from path+method without per-call parameter
-// QUOTE(ТЗ): "ApiClient и так знает текущие типы. Зачем передавать что либо в GET"
-// REF: user-msg-1
-// SOURCE: n/a
-// FORMAT THEOREM: ∀ path, method: dispatchers[path][method] = Dispatcher<ResponsesFor<OperationFor<Paths, path, method>>>
-// PURITY: CORE
-// EFFECT: none
-// INVARIANT: dispatcher map is total for all operations in Paths
-// COMPLEXITY: O(1) compile-time / O(0) runtime
-export type DispatchersForMethod<
-  Paths extends object,
-  Method extends HttpMethod
-> = {
-  readonly [Path in PathsForMethod<Paths, Method>]: {
-    readonly [K in Method]: Dispatcher<ResponsesFor<OperationFor<Paths, Path, Method>>>
+export type BodySerializer<T> = (
+  body: Writable<OperationRequestBodyContent<T>> | BodyInit | object,
+  headers?: Headers | HeadersOptions
+) => BodyInit
+
+export type PathSerializer = (
+  pathname: string,
+  pathParams: Record<string, unknown>
+) => string
+
+type BodyType<T = unknown> = {
+  json: T
+  text: Awaited<ReturnType<Response["text"]>>
+  blob: Awaited<ReturnType<Response["blob"]>>
+  arrayBuffer: Awaited<ReturnType<Response["arrayBuffer"]>>
+  stream: Response["body"]
+}
+
+export type ParseAs = keyof BodyType
+
+export type ParseAsResponse<T, Options> = Options extends { parseAs: ParseAs } ? BodyType<T>[Options["parseAs"]]
+  : T
+
+export interface DefaultParamsOption {
+  params?: {
+    query?: Record<string, unknown>
   }
 }
 
-export type DispatchersFor<Paths extends object> =
-  & DispatchersForMethod<Paths, "get">
-  & DispatchersForMethod<Paths, "post">
-  & DispatchersForMethod<Paths, "put">
-  & DispatchersForMethod<Paths, "delete">
-  & DispatchersForMethod<Paths, "patch">
-  & DispatchersForMethod<Paths, "head">
-  & DispatchersForMethod<Paths, "options">
+export type ParamsOption<T> = T extends { parameters: infer Parameters }
+  ? RequiredKeysOf<Parameters> extends never ? { params?: Parameters }
+  : { params: Parameters }
+  : DefaultParamsOption
 
-type ResponsesForOperation<
+export type RequestBodyOption<T> = Writable<OperationRequestBodyContent<T>> extends never ? { body?: never }
+  : IsOperationRequestBodyOptional<T> extends true ? { body?: Writable<OperationRequestBodyContent<T>> }
+  : { body: Writable<OperationRequestBodyContent<T>> }
+
+export type FetchOptions<T> = RequestOptions<T> & Omit<RequestInit, "body" | "headers">
+
+export type FetchResponse<
+  T extends Record<string | number, unknown>,
+  Options,
+  Media extends MediaType
+> =
+  | {
+    data: ParseAsResponse<Readable<SuccessResponse<ResponseObjectMap<T>, Media>>, Options>
+    error?: never
+    response: Response
+  }
+  | {
+    data?: never
+    error: Readable<ErrorResponse<ResponseObjectMap<T>, Media>>
+    response: Response
+  }
+
+export type RequestOptions<T> =
+  & ParamsOption<T>
+  & RequestBodyOption<T>
+  & {
+    baseUrl?: string
+    querySerializer?: QuerySerializer<T> | QuerySerializerOptions
+    bodySerializer?: BodySerializer<T>
+    pathSerializer?: PathSerializer
+    parseAs?: ParseAs
+    fetch?: ClientOptions["fetch"]
+    headers?: HeadersOptions
+    middleware?: Array<Middleware>
+  }
+
+export type MergedOptions<T = unknown> = {
+  baseUrl: string
+  parseAs: ParseAs
+  querySerializer: QuerySerializer<T>
+  bodySerializer: BodySerializer<T>
+  pathSerializer: PathSerializer
+  fetch: typeof globalThis.fetch
+}
+
+export interface MiddlewareRequestParams {
+  query?: Record<string, unknown>
+  header?: Record<string, unknown>
+  path?: Record<string, unknown>
+  cookie?: Record<string, unknown>
+}
+
+export interface MiddlewareCallbackParams {
+  request: Request
+  readonly schemaPath: string
+  readonly params: MiddlewareRequestParams
+  readonly id: string
+  readonly options: MergedOptions
+}
+
+export type Thenable<T> = {
+  then: (
+    onFulfilled: (value: T) => unknown,
+    onRejected?: (reason: unknown) => unknown
+  ) => unknown
+}
+
+export type AsyncValue<T> = T | Thenable<T>
+
+export type MiddlewareOnRequest = (
+  options: MiddlewareCallbackParams
+) => AsyncValue<Request | Response | undefined>
+
+export type MiddlewareOnResponse = (
+  options: MiddlewareCallbackParams & { response: Response }
+) => AsyncValue<Response | undefined>
+
+export type MiddlewareOnError = (
+  options: MiddlewareCallbackParams & { error: unknown }
+) => AsyncValue<Response | Error | undefined>
+
+export type Middleware =
+  | {
+    onRequest: MiddlewareOnRequest
+    onResponse?: MiddlewareOnResponse
+    onError?: MiddlewareOnError
+  }
+  | {
+    onRequest?: MiddlewareOnRequest
+    onResponse: MiddlewareOnResponse
+    onError?: MiddlewareOnError
+  }
+  | {
+    onRequest?: MiddlewareOnRequest
+    onResponse?: MiddlewareOnResponse
+    onError: MiddlewareOnError
+  }
+
+export type MaybeOptionalInit<Params, Location extends keyof Params> = RequiredKeysOf<
+  FetchOptions<FilterKeys<Params, Location>>
+> extends never ? FetchOptions<FilterKeys<Params, Location>> | undefined
+  : FetchOptions<FilterKeys<Params, Location>>
+
+type InitParam<Init> = RequiredKeysOf<Init> extends never ? [(Init & { [key: string]: unknown })?]
+  : [Init & { [key: string]: unknown }]
+
+type OperationFor<
   Paths extends object,
   Path extends keyof Paths,
   Method extends HttpMethod
-> = ResponsesFor<OperationFor<Paths, Path, Method>>
+> = Paths[Path] extends Record<Method, infer Operation> ? Operation & Record<string | number, unknown>
+  : never
 
-type RequestEffect<
+type MethodResult<
   Paths extends object,
-  Path extends keyof Paths,
-  Method extends HttpMethod
+  Path extends PathsWithMethod<Paths, Method>,
+  Method extends HttpMethod,
+  Init,
+  Media extends MediaType
 > = Effect.Effect<
-  ApiSuccess<ResponsesForOperation<Paths, Path, Method>>,
-  ApiFailure<ResponsesForOperation<Paths, Path, Method>>,
-  HttpClient.HttpClient
+  FetchResponse<OperationFor<Paths, Path & keyof Paths, Method>, Init, Media>,
+  Error
 >
 
-type RequestEffectWithHttpErrorsInSuccess<
+export type ClientMethod<
   Paths extends object,
-  Path extends keyof Paths,
-  Method extends HttpMethod
+  Method extends HttpMethod,
+  Media extends MediaType
+> = <
+  Path extends PathsWithMethod<Paths, Method>,
+  Init extends MaybeOptionalInit<Paths[Path], Extract<Method, keyof Paths[Path]>>
+>(
+  url: Path,
+  ...init: InitParam<Init>
+) => MethodResult<Paths, Path, Method, Init, Media>
+
+export type ClientRequestMethod<
+  Paths extends object,
+  Media extends MediaType
+> = <
+  Method extends HttpMethod,
+  Path extends PathsWithMethod<Paths, Method>,
+  Init extends MaybeOptionalInit<Paths[Path], Extract<Method, keyof Paths[Path]>>
+>(
+  method: Method,
+  url: Path,
+  ...init: InitParam<Init>
+) => MethodResult<Paths, Path, Method, Init, Media>
+
+type PathMethodResult<
+  PathInfo extends Record<string | number, unknown>,
+  Method extends keyof PathInfo,
+  Init,
+  Media extends MediaType
 > = Effect.Effect<
-  | ApiSuccess<ResponsesForOperation<Paths, Path, Method>>
-  | HttpError<ResponsesForOperation<Paths, Path, Method>>,
-  Exclude<
-    ApiFailure<ResponsesForOperation<Paths, Path, Method>>,
-    HttpError<ResponsesForOperation<Paths, Path, Method>>
-  >,
-  HttpClient.HttpClient
+  FetchResponse<PathInfo[Method] & Record<string | number, unknown>, Init, Media>,
+  Error
 >
 
-type DispatcherFor<
-  Paths extends object,
-  Path extends keyof Paths,
+export type ClientForPath<PathInfo extends Record<string | number, unknown>, Media extends MediaType> = {
+  [Method in keyof PathInfo as Uppercase<string & Method>]: <
+    Init extends MaybeOptionalInit<PathInfo, Method>
+  >(
+    ...init: InitParam<Init>
+  ) => PathMethodResult<PathInfo, Method, Init, Media>
+}
+
+export interface Client<Paths extends object, Media extends MediaType = MediaType> {
+  request: ClientRequestMethod<Paths, Media>
+  GET: ClientMethod<Paths, "get", Media>
+  PUT: ClientMethod<Paths, "put", Media>
+  POST: ClientMethod<Paths, "post", Media>
+  DELETE: ClientMethod<Paths, "delete", Media>
+  OPTIONS: ClientMethod<Paths, "options", Media>
+  HEAD: ClientMethod<Paths, "head", Media>
+  PATCH: ClientMethod<Paths, "patch", Media>
+  TRACE: ClientMethod<Paths, "trace", Media>
+  use(...middleware: Array<Middleware>): void
+  eject(...middleware: Array<Middleware>): void
+}
+
+export type ClientPathsWithMethod<
+  CreatedClient extends Client<Record<string, Record<HttpMethod, unknown>>>,
   Method extends HttpMethod
-> = Dispatcher<ResponsesForOperation<Paths, Path, Method>>
+> = CreatedClient extends Client<infer Paths, infer _Media> ? PathsWithMethod<Paths, Method>
+  : never
 
-type RequestOptionsForOperation<
-  Paths extends object,
-  Path extends keyof Paths,
-  Method extends HttpMethod
-> = RequestOptionsFor<OperationFor<Paths, Path, Method>>
+export type MethodResponse<
+  CreatedClient extends Client<Record<string, Record<HttpMethod, unknown>>>,
+  Method extends HttpMethod,
+  Path extends ClientPathsWithMethod<CreatedClient, Method>,
+  Options = object
+> = CreatedClient extends Client<
+  infer Paths extends Record<string, Record<HttpMethod, unknown>>,
+  infer Media extends MediaType
+> ? NonNullable<
+    FetchResponse<Paths[Path][Method] & Record<string | number, unknown>, Options, Media>["data"]
+  >
+  : never
 
-/**
- * Type-safe API client with full request-side type enforcement
- *
- * **Key guarantees:**
- * 1. GET only works on paths that have `get` method in schema
- * 2. POST only works on paths that have `post` method in schema
- * 3. Dispatcher type is derived from operation's responses
- * 4. Request options (params/query/body) are derived from operation
- *
- * **Effect Channel Design:**
- * - Success channel: `ApiSuccess<Responses>` - 2xx responses only
- * - Error channel: `ApiFailure<Responses>` - HTTP errors (4xx, 5xx) + boundary errors
- *
- * @typeParam Paths - OpenAPI paths type from openapi-typescript
- *
- * @pure false - operations perform HTTP requests
- * @invariant ∀ call: path ∈ PathsForMethod<Paths, method> ∧ options derived from operation
- */
-export type StrictApiClient<Paths extends object> = {
-  /**
-   * Execute GET request
-   *
-   * @typeParam Path - Path that supports GET method (enforced at type level)
-   * @param path - API path with GET method
-   * @param dispatcher - Response dispatcher (must match operation responses)
-   * @param options - Request options (typed from operation)
-   * @returns Effect with 2xx in success channel, errors in error channel
-   */
-  readonly GET: <Path extends PathsForMethod<Paths, "get">>(
-    path: Path,
-    dispatcher: DispatcherFor<Paths, Path, "get">,
-    options?: RequestOptionsForOperation<Paths, Path, "get">
-  ) => RequestEffect<Paths, Path, "get">
-
-  /**
-   * Execute POST request
-   */
-  readonly POST: <Path extends PathsForMethod<Paths, "post">>(
-    path: Path,
-    dispatcher: DispatcherFor<Paths, Path, "post">,
-    options?: RequestOptionsForOperation<Paths, Path, "post">
-  ) => RequestEffect<Paths, Path, "post">
-
-  /**
-   * Execute PUT request
-   */
-  readonly PUT: <Path extends PathsForMethod<Paths, "put">>(
-    path: Path,
-    dispatcher: DispatcherFor<Paths, Path, "put">,
-    options?: RequestOptionsForOperation<Paths, Path, "put">
-  ) => RequestEffect<Paths, Path, "put">
-
-  /**
-   * Execute DELETE request
-   */
-  readonly DELETE: <Path extends PathsForMethod<Paths, "delete">>(
-    path: Path,
-    dispatcher: DispatcherFor<Paths, Path, "delete">,
-    options?: RequestOptionsForOperation<Paths, Path, "delete">
-  ) => RequestEffect<Paths, Path, "delete">
-
-  /**
-   * Execute PATCH request
-   */
-  readonly PATCH: <Path extends PathsForMethod<Paths, "patch">>(
-    path: Path,
-    dispatcher: DispatcherFor<Paths, Path, "patch">,
-    options?: RequestOptionsForOperation<Paths, Path, "patch">
-  ) => RequestEffect<Paths, Path, "patch">
-
-  /**
-   * Execute HEAD request
-   */
-  readonly HEAD: <Path extends PathsForMethod<Paths, "head">>(
-    path: Path,
-    dispatcher: DispatcherFor<Paths, Path, "head">,
-    options?: RequestOptionsForOperation<Paths, Path, "head">
-  ) => RequestEffect<Paths, Path, "head">
-
-  /**
-   * Execute OPTIONS request
-   */
-  readonly OPTIONS: <Path extends PathsForMethod<Paths, "options">>(
-    path: Path,
-    dispatcher: DispatcherFor<Paths, Path, "options">,
-    options?: RequestOptionsForOperation<Paths, Path, "options">
-  ) => RequestEffect<Paths, Path, "options">
+export type PathBasedClient<
+  Paths extends Record<string | number, unknown>,
+  Media extends MediaType = MediaType
+> = {
+  [Path in keyof Paths]: ClientForPath<Paths[Path] & Record<string | number, unknown>, Media>
 }
 
-/**
- * Type-safe API client with auto-dispatching (dispatcher is derived from path+method)
- *
- * **Key guarantees:**
- * 1. GET only works on paths that have `get` method in schema
- * 2. Dispatcher is looked up from provided dispatcher map by path+method
- * 3. Request options (params/query/body) are derived from operation
- *
- * **Effect Channel Design:**
- * - Success channel: `ApiSuccess<Responses>` - 2xx responses only
- * - Error channel: `ApiFailure<Responses>` - HTTP errors (4xx, 5xx) + boundary errors
- *
- * @typeParam Paths - OpenAPI paths type from openapi-typescript
- *
- * @pure false - operations perform HTTP requests
- * @invariant ∀ call: path ∈ PathsForMethod<Paths, method> ∧ dispatcherMap[path][method] defined
- */
-export type StrictApiClientWithDispatchers<Paths extends object> = {
-  /**
-   * Execute GET request (dispatcher is inferred)
-   */
-  readonly GET: <Path extends PathsForMethod<Paths, "get">>(
-    path: Path,
-    options?: RequestOptionsForOperation<Paths, Path, "get">
-  ) => RequestEffect<Paths, Path, "get">
-
-  /**
-   * Execute POST request (dispatcher is inferred)
-   */
-  readonly POST: <Path extends PathsForMethod<Paths, "post">>(
-    path: Path,
-    options?: RequestOptionsForOperation<Paths, Path, "post">
-  ) => RequestEffect<Paths, Path, "post">
-
-  /**
-   * Execute PUT request (dispatcher is inferred)
-   */
-  readonly PUT: <Path extends PathsForMethod<Paths, "put">>(
-    path: Path,
-    options?: RequestOptionsForOperation<Paths, Path, "put">
-  ) => RequestEffect<Paths, Path, "put">
-
-  /**
-   * Execute DELETE request (dispatcher is inferred)
-   */
-  readonly DELETE: <Path extends PathsForMethod<Paths, "delete">>(
-    path: Path,
-    options?: RequestOptionsForOperation<Paths, Path, "delete">
-  ) => RequestEffect<Paths, Path, "delete">
-
-  /**
-   * Execute PATCH request (dispatcher is inferred)
-   */
-  readonly PATCH: <Path extends PathsForMethod<Paths, "patch">>(
-    path: Path,
-    options?: RequestOptionsForOperation<Paths, Path, "patch">
-  ) => RequestEffect<Paths, Path, "patch">
-
-  /**
-   * Execute HEAD request (dispatcher is inferred)
-   */
-  readonly HEAD: <Path extends PathsForMethod<Paths, "head">>(
-    path: Path,
-    options?: RequestOptionsForOperation<Paths, Path, "head">
-  ) => RequestEffect<Paths, Path, "head">
-
-  /**
-   * Execute OPTIONS request (dispatcher is inferred)
-   */
-  readonly OPTIONS: <Path extends PathsForMethod<Paths, "options">>(
-    path: Path,
-    options?: RequestOptionsForOperation<Paths, Path, "options">
-  ) => RequestEffect<Paths, Path, "options">
+export type DispatchersFor<Paths extends object> = {
+  [Path in keyof Paths]?: {
+    [Method in HttpMethod]?: object
+  }
 }
 
-/**
- * Ergonomic API client where HTTP statuses (2xx + 4xx/5xx from schema)
- * are returned in the success value channel.
- *
- * Boundary/protocol errors remain in the error channel.
- * This removes the need for `Effect.either` when handling normal HTTP statuses.
- */
-export type ClientEffect<Paths extends object> = {
-  readonly GET: <Path extends PathsForMethod<Paths, "get">>(
-    path: Path,
-    options?: RequestOptionsForOperation<Paths, Path, "get">
-  ) => RequestEffectWithHttpErrorsInSuccess<Paths, Path, "get">
-
-  readonly POST: <Path extends PathsForMethod<Paths, "post">>(
-    path: Path,
-    options?: RequestOptionsForOperation<Paths, Path, "post">
-  ) => RequestEffectWithHttpErrorsInSuccess<Paths, Path, "post">
-
-  readonly PUT: <Path extends PathsForMethod<Paths, "put">>(
-    path: Path,
-    options?: RequestOptionsForOperation<Paths, Path, "put">
-  ) => RequestEffectWithHttpErrorsInSuccess<Paths, Path, "put">
-
-  readonly DELETE: <Path extends PathsForMethod<Paths, "delete">>(
-    path: Path,
-    options?: RequestOptionsForOperation<Paths, Path, "delete">
-  ) => RequestEffectWithHttpErrorsInSuccess<Paths, Path, "delete">
-
-  readonly PATCH: <Path extends PathsForMethod<Paths, "patch">>(
-    path: Path,
-    options?: RequestOptionsForOperation<Paths, Path, "patch">
-  ) => RequestEffectWithHttpErrorsInSuccess<Paths, Path, "patch">
-
-  readonly HEAD: <Path extends PathsForMethod<Paths, "head">>(
-    path: Path,
-    options?: RequestOptionsForOperation<Paths, Path, "head">
-  ) => RequestEffectWithHttpErrorsInSuccess<Paths, Path, "head">
-
-  readonly OPTIONS: <Path extends PathsForMethod<Paths, "options">>(
-    path: Path,
-    options?: RequestOptionsForOperation<Paths, Path, "options">
-  ) => RequestEffectWithHttpErrorsInSuccess<Paths, Path, "options">
-}
+export type StrictApiClient<Paths extends object> = Client<Paths>
+export type StrictApiClientWithDispatchers<Paths extends object> = Client<Paths>
+export type ClientEffect<Paths extends object> = Client<Paths>

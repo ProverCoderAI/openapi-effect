@@ -28,10 +28,37 @@ export {
 
 // High-level client creation API
 export type {
+  Client,
   ClientEffect,
+  ClientForPath,
   ClientOptions,
   DispatchersFor,
+  FetchOptions,
+  FetchResponse,
+  HeadersOptions,
+  Middleware,
+  ParseAs,
+  PathBasedClient,
+  QuerySerializer,
+  QuerySerializerOptions,
+  RequestBodyOption,
+  RequestOptions as FetchRequestOptions,
   StrictApiClient,
   StrictApiClientWithDispatchers
 } from "./create-client.js"
-export { createClient, createClientEffect, registerDefaultDispatchers } from "./create-client.js"
+export {
+  createClient,
+  createClientEffect,
+  createFinalURL,
+  createPathBasedClient,
+  createQuerySerializer,
+  defaultBodySerializer,
+  defaultPathSerializer,
+  mergeHeaders,
+  registerDefaultDispatchers,
+  removeTrailingSlash,
+  serializeArrayParam,
+  serializeObjectParam,
+  serializePrimitiveParam,
+  wrapAsPathBasedClient
+} from "./create-client.js"

@@ -22,16 +22,26 @@ export {
   createClient,
   createClientEffect,
   createDispatcher,
+  createFinalURL,
+  createPathBasedClient,
+  createQuerySerializer,
   createStrictClient,
   createUniversalDispatcher,
+  defaultBodySerializer,
+  defaultPathSerializer,
   executeRequest,
+  mergeHeaders,
   parseJSON,
   registerDefaultDispatchers,
+  removeTrailingSlash,
+  serializeArrayParam,
+  serializeObjectParam,
+  serializePrimitiveParam,
   unexpectedContentType,
   unexpectedStatus
 } from "./shell/api-client/index.js"
 
-export { createClientEffect as default } from "./shell/api-client/index.js"
+export { createClient as default } from "./shell/api-client/index.js"
 
 // Generated dispatchers (auto-generated from OpenAPI schema)
 export * from "./generated/index.js"

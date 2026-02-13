@@ -1,182 +1,113 @@
-// CHANGE: Integration test verifying the exact user DSL snippet from issue #5
-// WHY: Ensure the import/usage pattern requested by the user compiles and works end-to-end
-// QUOTE(ТЗ): "import { createClientEffect, type ClientOptions } from 'openapi-effect' ... apiClientEffect.POST('/api/auth/login', { body: credentials })"
-// REF: issue-5
+// CHANGE: Integration test for createClientEffect using openapi-fetch response envelope
+// WHY: Validate drop-in input contract with Effect output channel
+// QUOTE(ТЗ): "input 1 в 1 ... output Effect<,,>"
+// REF: user-msg-2026-02-12
 // SOURCE: n/a
-// FORMAT THEOREM: ∀ Paths, options: createClientEffect<Paths>(options).POST(path, { body }) → Effect<ApiSuccess | HttpError, BoundaryError, HttpClient>
 // PURITY: SHELL
 // EFFECT: Effect<void, never, never>
-// INVARIANT: The exact user snippet compiles and produces correct runtime behavior
+// INVARIANT: HTTP non-2xx stays in `error` field, transport failures stay in Effect error channel
 // COMPLEXITY: O(1) per test
 
-import * as HttpClient from "@effect/platform/HttpClient"
-import * as HttpClientResponse from "@effect/platform/HttpClientResponse"
-import { Effect, Layer } from "effect"
+import { Effect } from "effect"
 import { describe, expect, it } from "vitest"
 
-// CHANGE: Import via the package's main entry point (src/index.ts)
-// WHY: Verify the user's import pattern `from "openapi-effect"` resolves correctly
-// REF: issue-5
+import type { paths } from "../../src/core/api/openapi.js"
 import { createClientEffect } from "../../src/index.js"
 import type { ClientOptions } from "../../src/index.js"
 
-// CHANGE: Import paths from the auth OpenAPI schema
-// WHY: Match the user's pattern `import type { paths } from "./openapi.d.ts"`
-// REF: issue-5
-import type { paths } from "../../src/core/api/openapi.js"
-
-/**
- * Create a mock HttpClient layer that returns a fixed response
- *
- * @pure true - returns pure layer
- */
-const createMockHttpClientLayer = (
+const createMockFetch = (
   status: number,
   headers: Record<string, string>,
   body: string
-): Layer.Layer<HttpClient.HttpClient> =>
-  Layer.succeed(
-    HttpClient.HttpClient,
-    HttpClient.make(
-      (request) =>
-        Effect.succeed(
-          HttpClientResponse.fromWeb(
-            request,
-            status === 204 || status === 304
-              ? new Response(null, { status, headers: new Headers(headers) })
-              : new Response(body, { status, headers: new Headers(headers) })
-          )
-        )
+) =>
+(_request: Request) =>
+  Effect.runPromise(
+    Effect.succeed(
+      status === 204 || status === 304
+        ? new Response(null, { status, headers: new Headers(headers) })
+        : new Response(body, { status, headers: new Headers(headers) })
     )
   )
 
-/**
- * Test fixtures for integration tests
- *
- * @pure true - immutable test data factories
- */
-const fixtures = {
-  loginBody: () => ({ email: "user@example.com", password: `test-${Date.now()}` }),
-  wrongLoginBody: () => ({ email: "user@example.com", password: `wrong-${Date.now()}` })
-} as const
-
-// =============================================================================
-// SECTION: Exact user snippet integration test (CI/CD check)
-// =============================================================================
-
-describe("CI/CD: exact user snippet from issue #5", () => {
-  // --- The exact code from the user's PR comment ---
-  const clientOptions: ClientOptions = {
-    baseUrl: "https://petstore.example.com",
-    credentials: "include"
-  }
-  const apiClientEffect = createClientEffect<paths>(clientOptions)
-
-  it("should compile and execute: apiClientEffect.POST('/api/auth/login', { body: credentials })", () =>
+describe("createClientEffect integration", () => {
+  it("returns { data, response } for 200 login", () =>
     Effect.gen(function*() {
-      const credentials = fixtures.loginBody()
-      const successBody = JSON.stringify({
-        id: "550e8400-e29b-41d4-a716-446655440000",
-        email: "user@example.com",
-        firstName: "John",
-        lastName: "Doe",
-        profileImageUrl: null,
-        emailVerified: true,
-        phoneVerified: false
-      })
-
-      // Type-safe — path, method, and body all enforced at compile time
-      const result = yield* apiClientEffect.POST("/api/auth/login", {
-        body: credentials
-      }).pipe(
-        Effect.provide(
-          createMockHttpClientLayer(200, { "content-type": "application/json" }, successBody)
-        )
-      )
-
-      expect("_tag" in result).toBe(false)
-      expect(result.status).toBe(200)
-      expect(result.contentType).toBe("application/json")
-      const body = result.body as { id: string; email: string }
-      expect(body.email).toBe("user@example.com")
-    }).pipe(Effect.runPromise))
-
-  it("should compile and execute: yield* apiClientEffect.POST (inside Effect.gen)", () =>
-    Effect.gen(function*() {
-      const credentials = fixtures.loginBody()
       const successBody = JSON.stringify({
         id: "550e8400-e29b-41d4-a716-446655440000",
         email: "user@example.com"
       })
 
-      // This verifies the `yield*` pattern from the user's snippet
-      const result = yield* apiClientEffect.POST("/api/auth/login", {
-        body: credentials
-      }).pipe(
-        Effect.provide(
-          createMockHttpClientLayer(200, { "content-type": "application/json" }, successBody)
-        )
-      )
+      const clientOptions: ClientOptions = {
+        baseUrl: "https://petstore.example.com",
+        credentials: "include",
+        fetch: createMockFetch(200, { "content-type": "application/json" }, successBody)
+      }
+      const apiClientEffect = createClientEffect<paths>(clientOptions)
 
-      expect("_tag" in result).toBe(false)
-      expect(result.status).toBe(200)
-      expect(result.contentType).toBe("application/json")
-      const body = result.body as { email: string }
-      expect(body.email).toBe("user@example.com")
+      const generatedPassword = `pw-${Date.now()}`
+      const result = yield* apiClientEffect.POST("/api/auth/login", {
+        body: { email: "user@example.com", password: generatedPassword }
+      })
+
+      expect(result.response.status).toBe(200)
+      expect(result.error).toBeUndefined()
+      expect(result.data).toMatchObject({ email: "user@example.com" })
     }).pipe(Effect.runPromise))
 
-  it("should expose 401 as HttpError value without Effect.either", () =>
+  it("returns { error, response } for 401 login", () =>
     Effect.gen(function*() {
-      const credentials = fixtures.wrongLoginBody()
       const errorBody = JSON.stringify({ error: "invalid_credentials" })
 
-      const result = yield* apiClientEffect.POST("/api/auth/login", {
-        body: credentials
-      }).pipe(
-        Effect.provide(
-          createMockHttpClientLayer(401, { "content-type": "application/json" }, errorBody)
-        )
-      )
-
-      expect("_tag" in result).toBe(true)
-      if ("_tag" in result) {
-        expect(result).toMatchObject({
-          _tag: "HttpError",
-          status: 401
-        })
+      const clientOptions: ClientOptions = {
+        baseUrl: "https://petstore.example.com",
+        credentials: "include",
+        fetch: createMockFetch(401, { "content-type": "application/json" }, errorBody)
       }
+      const apiClientEffect = createClientEffect<paths>(clientOptions)
+
+      const generatedPassword = `bad-${Date.now()}`
+      const result = yield* apiClientEffect.POST("/api/auth/login", {
+        body: { email: "user@example.com", password: generatedPassword }
+      })
+
+      expect(result.response.status).toBe(401)
+      expect(result.data).toBeUndefined()
+      expect(result.error).toMatchObject({ error: "invalid_credentials" })
     }).pipe(Effect.runPromise))
 
-  it("should work with GET requests (no body required)", () =>
+  it("handles GET without body", () =>
     Effect.gen(function*() {
       const profileBody = JSON.stringify({
         id: "550e8400-e29b-41d4-a716-446655440000",
         email: "user@example.com"
       })
 
-      const result = yield* apiClientEffect.GET("/api/auth/me").pipe(
-        Effect.provide(
-          createMockHttpClientLayer(200, { "content-type": "application/json" }, profileBody)
-        )
-      )
+      const clientOptions: ClientOptions = {
+        baseUrl: "https://petstore.example.com",
+        credentials: "include",
+        fetch: createMockFetch(200, { "content-type": "application/json" }, profileBody)
+      }
+      const apiClientEffect = createClientEffect<paths>(clientOptions)
 
-      expect("_tag" in result).toBe(false)
-      expect(result.status).toBe(200)
-      const body = result.body as { email: string }
-      expect(body.email).toBe("user@example.com")
+      const result = yield* apiClientEffect.GET("/api/auth/me")
+
+      expect(result.response.status).toBe(200)
+      expect(result.data).toMatchObject({ email: "user@example.com" })
     }).pipe(Effect.runPromise))
 
-  it("should handle 204 no-content responses", () =>
+  it("handles 204 no-content", () =>
     Effect.gen(function*() {
-      const result = yield* apiClientEffect.POST("/api/auth/logout").pipe(
-        Effect.provide(
-          createMockHttpClientLayer(204, {}, "")
-        )
-      )
+      const clientOptions: ClientOptions = {
+        baseUrl: "https://petstore.example.com",
+        credentials: "include",
+        fetch: createMockFetch(204, {}, "")
+      }
+      const apiClientEffect = createClientEffect<paths>(clientOptions)
 
-      expect("_tag" in result).toBe(false)
-      expect(result.status).toBe(204)
-      expect(result.contentType).toBe("none")
-      expect(result.body).toBeUndefined()
+      const result = yield* apiClientEffect.POST("/api/auth/logout")
+
+      expect(result.response.status).toBe(204)
+      expect(result.data).toBeUndefined()
+      expect(result.error).toBeUndefined()
     }).pipe(Effect.runPromise))
 })
