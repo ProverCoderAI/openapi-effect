@@ -1,13 +1,13 @@
 import type { MediaType } from "openapi-typescript-helpers"
 
 import { asStrictApiClient } from "../../core/axioms.js"
+import type { ClientEffect, EffectClient } from "./create-client-effect-types.js"
 import type { RuntimeClient, RuntimeFetchOptions } from "./create-client-runtime-types.js"
-import { createRuntimeClient } from "./create-client-runtime.js"
-import type { Client, ClientEffect, ClientOptions, DispatchersFor, PathBasedClient } from "./create-client-types.js"
+import { createRuntimeClient, createRuntimeEffectClient } from "./create-client-runtime.js"
+import type { Client, ClientOptions, DispatchersFor, PathBasedClient } from "./create-client-types.js"
 
 export type {
   Client,
-  ClientEffect,
   ClientForPath,
   ClientMethod,
   ClientOptions,
@@ -29,6 +29,13 @@ export type {
   StrictApiClient,
   StrictApiClientWithDispatchers
 } from "./create-client-types.js"
+
+export type {
+  ClientEffect,
+  EffectClient,
+  EffectClientMethod,
+  EffectClientRequestMethod
+} from "./create-client-effect-types.js"
 
 export {
   createFinalURL,
@@ -103,7 +110,7 @@ export const createPathBasedClient = <
 
 export const createClientEffect = <Paths extends object>(
   clientOptions?: ClientOptions
-): ClientEffect<Paths> => createClient<Paths>(clientOptions)
+): ClientEffect<Paths> => asStrictApiClient<EffectClient<Paths>>(createRuntimeEffectClient(clientOptions))
 
 export const registerDefaultDispatchers = <Paths extends object>(
   _dispatchers: DispatchersFor<Paths>

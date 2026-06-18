@@ -1,14 +1,14 @@
-// CHANGE: Integration test for createClientEffect using openapi-fetch response envelope
-// WHY: Validate drop-in input contract with Effect output channel
+// CHANGE: Integration test for createClientEffect using openapi-fetch inputs and strict Effect output
+// WHY: Validate drop-in input contract with inferred Effect success/error channels
 // QUOTE(ТЗ): "input 1 в 1 ... output Effect<,,>"
 // REF: user-msg-2026-02-12
 // SOURCE: n/a
 // PURITY: SHELL
 // EFFECT: Effect<void, never, never>
-// INVARIANT: HTTP non-2xx stays in `error` field, transport failures stay in Effect error channel
+// INVARIANT: HTTP non-2xx goes to Effect error channel without per-call schema
 // COMPLEXITY: O(1) per test
 
-import { Effect } from "effect"
+import { Effect, Either } from "effect"
 import { describe, expect, it } from "vitest"
 
 import type { paths } from "../../src/core/api/openapi.js"
@@ -30,7 +30,7 @@ const createMockFetch = (
   )
 
 describe("createClientEffect integration", () => {
-  it("returns { data, response } for 200 login", () =>
+  it("returns ApiSuccess for 200 login", () =>
     Effect.gen(function*() {
       const successBody = JSON.stringify({
         id: "550e8400-e29b-41d4-a716-446655440000",
@@ -49,12 +49,12 @@ describe("createClientEffect integration", () => {
         body: { email: "user@example.com", password: generatedPassword }
       })
 
-      expect(result.response.status).toBe(200)
-      expect(result.error).toBeUndefined()
-      expect(result.data).toMatchObject({ email: "user@example.com" })
+      expect(result.status).toBe(200)
+      expect(result.contentType).toBe("application/json")
+      expect(result.body).toMatchObject({ email: "user@example.com" })
     }).pipe(Effect.runPromise))
 
-  it("returns { error, response } for 401 login", () =>
+  it("returns HttpError in error channel for 401 login", () =>
     Effect.gen(function*() {
       const errorBody = JSON.stringify({ error: "invalid_credentials" })
 
@@ -66,13 +66,21 @@ describe("createClientEffect integration", () => {
       const apiClientEffect = createClientEffect<paths>(clientOptions)
 
       const generatedPassword = `bad-${Date.now()}`
-      const result = yield* apiClientEffect.POST("/api/auth/login", {
-        body: { email: "user@example.com", password: generatedPassword }
-      })
+      const result = yield* Effect.either(
+        apiClientEffect.POST("/api/auth/login", {
+          body: { email: "user@example.com", password: generatedPassword }
+        })
+      )
 
-      expect(result.response.status).toBe(401)
-      expect(result.data).toBeUndefined()
-      expect(result.error).toMatchObject({ error: "invalid_credentials" })
+      expect(Either.isLeft(result)).toBe(true)
+      if (Either.isLeft(result)) {
+        expect(result.left).toMatchObject({
+          _tag: "HttpError",
+          status: 401,
+          contentType: "application/json",
+          body: { error: "invalid_credentials" }
+        })
+      }
     }).pipe(Effect.runPromise))
 
   it("handles GET without body", () =>
@@ -91,8 +99,8 @@ describe("createClientEffect integration", () => {
 
       const result = yield* apiClientEffect.GET("/api/auth/me")
 
-      expect(result.response.status).toBe(200)
-      expect(result.data).toMatchObject({ email: "user@example.com" })
+      expect(result.status).toBe(200)
+      expect(result.body).toMatchObject({ email: "user@example.com" })
     }).pipe(Effect.runPromise))
 
   it("handles 204 no-content", () =>
@@ -106,8 +114,8 @@ describe("createClientEffect integration", () => {
 
       const result = yield* apiClientEffect.POST("/api/auth/logout")
 
-      expect(result.response.status).toBe(204)
-      expect(result.data).toBeUndefined()
-      expect(result.error).toBeUndefined()
+      expect(result.status).toBe(204)
+      expect(result.contentType).toBe("none")
+      expect(result.body).toBeUndefined()
     }).pipe(Effect.runPromise))
 })

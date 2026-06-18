@@ -9,6 +9,7 @@
 
 import { describe, expectTypeOf, it } from "vitest"
 
+import type { Effect } from "effect"
 import type {
   ApiFailure,
   ApiSuccess,
@@ -17,6 +18,7 @@ import type {
   RequestOptionsFor
 } from "../../src/core/api-client/strict-types.js"
 import type { operations, paths } from "../../src/core/api/openapi.js"
+import { createClientEffect } from "../../src/index.js"
 
 // Response types for each auth operation
 type LoginResponses = operations["auth.postLogin"]["responses"]
@@ -176,5 +178,64 @@ describe("Auth schema: RequestOptionsFor body constraints", () => {
     type Opts = RequestOptionsFor<MeOp>
     type HasOptionalBody = undefined extends Opts["body"] ? true : false
     expectTypeOf<HasOptionalBody>().toEqualTypeOf<true>()
+  })
+})
+
+// =============================================================================
+// SECTION: createClientEffect keeps openapi-fetch input shape and infers output
+// =============================================================================
+
+describe("createClientEffect: input compatibility with inferred Effect output", () => {
+  const client = createClientEffect<paths>()
+
+  it("infers login success and failure channels from the path and method", () => {
+    const generatedPassword = `pw-${Date.now()}`
+    const _result = client.POST("/api/auth/login", {
+      body: { email: "user@example.com", password: generatedPassword }
+    })
+
+    expectTypeOf<typeof _result>().toEqualTypeOf<
+      Effect.Effect<ApiSuccess<LoginResponses>, ApiFailure<LoginResponses>>
+    >()
+  })
+
+  it("does not require dispatcher or output schema in method options", () => {
+    const generatedPassword = `pw-${Date.now()}`
+    const _login = client.POST("/api/auth/login", {
+      body: { email: "user@example.com", password: generatedPassword }
+    })
+
+    const _me = client.GET("/api/auth/me")
+    const _logout = client.POST("/api/auth/logout")
+
+    expectTypeOf<typeof _login>().toEqualTypeOf<
+      Effect.Effect<ApiSuccess<LoginResponses>, ApiFailure<LoginResponses>>
+    >()
+    expectTypeOf<typeof _me>().toEqualTypeOf<
+      Effect.Effect<ApiSuccess<MeResponses>, ApiFailure<MeResponses>>
+    >()
+    expectTypeOf<typeof _logout>().toEqualTypeOf<
+      Effect.Effect<ApiSuccess<LogoutResponses>, ApiFailure<LogoutResponses>>
+    >()
+  })
+
+  it("accepts openapi-fetch middleware hooks that return void", () => {
+    client.use({
+      onRequest: () => {}
+    })
+
+    expectTypeOf<true>().toEqualTypeOf<true>()
+  })
+
+  it("rejects missing required request body", () => {
+    // @ts-expect-error login body is required by the OpenAPI operation
+    client.POST("/api/auth/login")
+    expectTypeOf<true>().toEqualTypeOf<true>()
+  })
+
+  it("rejects method/path combinations absent from the schema", () => {
+    // @ts-expect-error /api/auth/login does not define GET
+    client.GET("/api/auth/login")
+    expectTypeOf<true>().toEqualTypeOf<true>()
   })
 })

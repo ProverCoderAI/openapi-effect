@@ -1,11 +1,11 @@
-// CHANGE: Runtime tests for createClientEffect with openapi-fetch-compatible envelope
-// WHY: Ensure non-2xx is represented in `error` field and Effect error channel is transport-only
+// CHANGE: Runtime tests for createClientEffect with openapi-fetch-compatible inputs and strict Effect output
+// WHY: Ensure non-2xx is represented in the Effect error channel without per-call output schema
 // QUOTE(ТЗ): "openapi-effect должен почти 1 в 1 заменяться с openapi-fetch"
 // REF: user-msg-2026-02-12
 // SOURCE: n/a
 // PURITY: SHELL
 // EFFECT: Effect<void, never, never>
-// INVARIANT: Success/error envelopes follow openapi-fetch contract
+// INVARIANT: 2xx -> success channel; non-2xx/boundary errors -> error channel
 // COMPLEXITY: O(1) per test
 
 import { Effect, Either } from "effect"
@@ -54,9 +54,9 @@ describe("createClientEffect", () => {
         body: { email: "user@example.com", password: generatedPassword }
       })
 
-      expect(result.response.status).toBe(200)
-      expect(result.error).toBeUndefined()
-      expect(result.data).toMatchObject({ email: "user@example.com" })
+      expect(result.status).toBe(200)
+      expect(result.contentType).toBe("application/json")
+      expect(result.body).toMatchObject({ email: "user@example.com" })
     }).pipe(Effect.runPromise))
 
   it("returns error envelope for login 401", () =>
@@ -71,13 +71,21 @@ describe("createClientEffect", () => {
       const apiClientEffect = createClientEffect<AuthPaths>(clientOptions)
 
       const generatedPassword = `bad-${Date.now()}`
-      const result = yield* apiClientEffect.POST("/api/auth/login", {
-        body: { email: "user@example.com", password: generatedPassword }
-      })
+      const result = yield* Effect.either(
+        apiClientEffect.POST("/api/auth/login", {
+          body: { email: "user@example.com", password: generatedPassword }
+        })
+      )
 
-      expect(result.response.status).toBe(401)
-      expect(result.data).toBeUndefined()
-      expect(result.error).toMatchObject({ error: "invalid_credentials" })
+      expect(Either.isLeft(result)).toBe(true)
+      if (Either.isLeft(result)) {
+        expect(result.left).toMatchObject({
+          _tag: "HttpError",
+          status: 401,
+          contentType: "application/json",
+          body: { error: "invalid_credentials" }
+        })
+      }
     }).pipe(Effect.runPromise))
 
   it("returns undefined data for 204", () =>
@@ -91,9 +99,9 @@ describe("createClientEffect", () => {
 
       const result = yield* apiClientEffect.POST("/api/auth/logout")
 
-      expect(result.response.status).toBe(204)
-      expect(result.data).toBeUndefined()
-      expect(result.error).toBeUndefined()
+      expect(result.status).toBe(204)
+      expect(result.contentType).toBe("none")
+      expect(result.body).toBeUndefined()
     }).pipe(Effect.runPromise))
 
   it("returns success envelope for register 201", () =>
@@ -115,9 +123,9 @@ describe("createClientEffect", () => {
         body: { token: "invite-token", password: generatedPassword }
       })
 
-      expect(result.response.status).toBe(201)
-      expect(result.error).toBeUndefined()
-      expect(result.data).toMatchObject({ email: "new@example.com" })
+      expect(result.status).toBe(201)
+      expect(result.contentType).toBe("application/json")
+      expect(result.body).toMatchObject({ email: "new@example.com" })
     }).pipe(Effect.runPromise))
 
   it("keeps transport failures in Effect error channel", () =>
@@ -133,7 +141,10 @@ describe("createClientEffect", () => {
 
       expect(Either.isLeft(outcome)).toBe(true)
       if (Either.isLeft(outcome)) {
-        expect(outcome.left.message).toContain("network down")
+        expect(outcome.left).toMatchObject({ _tag: "TransportError" })
+        if (outcome.left._tag === "TransportError") {
+          expect(outcome.left.error.message).toContain("network down")
+        }
       }
     }).pipe(Effect.runPromise))
 })

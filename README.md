@@ -8,29 +8,42 @@ Drop-in replacement for `openapi-fetch` with an opt-in Effect API.
 pnpm add @prover-coder-ai/openapi-effect
 ```
 
-## Usage (Promise API)
+## Usage (Envelope API)
 
-This package implements an `openapi-fetch` compatible API, so most code can be migrated by changing only the import.
+This package implements `openapi-fetch` compatible method inputs and response envelopes.
 
 ```ts
+import { Effect } from "effect"
 import createClient from "@prover-coder-ai/openapi-effect"
 import type { paths } from "./openapi"
 
 const client = createClient<paths>({ baseUrl: "https://api.example.com" })
 
-const { data, error } = await client.GET("/pets", {
-  params: { query: { limit: 10 } }
-})
+const program = Effect.gen(function* () {
+  const { data, error } = yield* client.GET("/pets", {
+    params: { query: { limit: 10 } }
+  })
 
-if (error) {
-  // handle error
-}
+  return error ?? data
+})
 ```
 
 ## Usage (Effect API)
 
-Effect-based client is available as an opt-in API.
+`createClientEffect` keeps the same method inputs but moves non-2xx responses into the Effect error channel.
 
 ```ts
-import { createClientEffect, FetchHttpClient } from "@prover-coder-ai/openapi-effect"
+import { Effect } from "effect"
+import { createClientEffect } from "@prover-coder-ai/openapi-effect"
+import type { paths } from "./openapi"
+
+const client = createClientEffect<paths>({ baseUrl: "https://api.example.com" })
+
+const program = Effect.gen(function* () {
+  const result = yield* client.GET("/pets", {
+    params: { query: { limit: 10 } }
+  })
+
+  return result.body
+})
 ```

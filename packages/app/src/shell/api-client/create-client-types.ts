@@ -151,19 +151,19 @@ export type Thenable<T> = {
   ) => unknown
 }
 
-export type AsyncValue<T> = T | Thenable<T>
+export type AsyncValue<T> = T | undefined | Thenable<T | undefined>
 
-export type MiddlewareOnRequest = (
-  options: MiddlewareCallbackParams
-) => AsyncValue<Request | Response | undefined>
+export type MiddlewareOnRequest =
+  | ((options: MiddlewareCallbackParams) => AsyncValue<Request | Response>)
+  | ((options: MiddlewareCallbackParams) => void)
 
-export type MiddlewareOnResponse = (
-  options: MiddlewareCallbackParams & { response: Response }
-) => AsyncValue<Response | undefined>
+export type MiddlewareOnResponse =
+  | ((options: MiddlewareCallbackParams & { response: Response }) => AsyncValue<Response>)
+  | ((options: MiddlewareCallbackParams & { response: Response }) => void)
 
-export type MiddlewareOnError = (
-  options: MiddlewareCallbackParams & { error: unknown }
-) => AsyncValue<Response | Error | undefined>
+export type MiddlewareOnError =
+  | ((options: MiddlewareCallbackParams & { error: unknown }) => AsyncValue<Response | Error>)
+  | ((options: MiddlewareCallbackParams & { error: unknown }) => void)
 
 export type Middleware =
   | {
@@ -187,10 +187,10 @@ export type MaybeOptionalInit<Params, Location extends keyof Params> = RequiredK
 > extends never ? FetchOptions<FilterKeys<Params, Location>> | undefined
   : FetchOptions<FilterKeys<Params, Location>>
 
-type InitParam<Init> = RequiredKeysOf<Init> extends never ? [(Init & { [key: string]: unknown })?]
+export type InitParam<Init> = RequiredKeysOf<Init> extends never ? [(Init & { [key: string]: unknown })?]
   : [Init & { [key: string]: unknown }]
 
-type OperationFor<
+export type OperationFor<
   Paths extends object,
   Path extends keyof Paths,
   Method extends HttpMethod
@@ -208,6 +208,18 @@ type MethodResult<
   Error
 >
 
+export type MethodArgs<
+  Paths extends object,
+  Method extends HttpMethod,
+  Path extends PathsWithMethod<Paths, Method>,
+  Init extends MaybeOptionalInit<Paths[Path], Extract<Method, keyof Paths[Path]>>
+> = [url: Path, ...init: InitParam<Init>]
+
+export type RequestMethodArgs<Method extends HttpMethod, Args extends ReadonlyArray<unknown>> = [
+  method: Method,
+  ...args: Args
+]
+
 export type ClientMethod<
   Paths extends object,
   Method extends HttpMethod,
@@ -216,8 +228,7 @@ export type ClientMethod<
   Path extends PathsWithMethod<Paths, Method>,
   Init extends MaybeOptionalInit<Paths[Path], Extract<Method, keyof Paths[Path]>>
 >(
-  url: Path,
-  ...init: InitParam<Init>
+  ...args: MethodArgs<Paths, Method, Path, Init>
 ) => MethodResult<Paths, Path, Method, Init, Media>
 
 export type ClientRequestMethod<
@@ -228,9 +239,7 @@ export type ClientRequestMethod<
   Path extends PathsWithMethod<Paths, Method>,
   Init extends MaybeOptionalInit<Paths[Path], Extract<Method, keyof Paths[Path]>>
 >(
-  method: Method,
-  url: Path,
-  ...init: InitParam<Init>
+  ...args: RequestMethodArgs<Method, MethodArgs<Paths, Method, Path, Init>>
 ) => MethodResult<Paths, Path, Method, Init, Media>
 
 type PathMethodResult<
@@ -299,4 +308,3 @@ export type DispatchersFor<Paths extends object> = {
 
 export type StrictApiClient<Paths extends object> = Client<Paths>
 export type StrictApiClientWithDispatchers<Paths extends object> = Client<Paths>
-export type ClientEffect<Paths extends object> = Client<Paths>

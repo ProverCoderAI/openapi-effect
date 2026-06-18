@@ -1,7 +1,8 @@
 import { Effect } from "effect"
 
+import { asMiddlewareResult } from "../../core/axioms.js"
 import { toError } from "./create-client-response.js"
-import type { AsyncValue, MergedOptions, Middleware, MiddlewareRequestParams, Thenable } from "./create-client-types.js"
+import type { MergedOptions, Middleware, MiddlewareRequestParams, Thenable } from "./create-client-types.js"
 
 const isThenable = <T>(value: unknown): value is Thenable<T> => (
   typeof value === "object"
@@ -10,19 +11,27 @@ const isThenable = <T>(value: unknown): value is Thenable<T> => (
   && typeof Reflect.get(value, "then") === "function"
 )
 
-export const toPromiseEffect = <T>(value: AsyncValue<T>): Effect.Effect<T, Error> => (
+const succeedMiddlewareResult = <T>(value: unknown): Effect.Effect<T | undefined> => {
+  if (value === undefined) {
+    return Effect.sync((): undefined => undefined)
+  }
+
+  return Effect.succeed(asMiddlewareResult<T>(value))
+}
+
+export const toPromiseEffect = <T>(value: unknown): Effect.Effect<T | undefined, Error> => (
   isThenable(value)
-    ? Effect.async<T, Error>((resume) => {
+    ? Effect.async<T | undefined, Error>((resume) => {
       value.then(
         (result) => {
-          resume(Effect.succeed(result))
+          resume(succeedMiddlewareResult<T>(result))
         },
         (error) => {
           resume(Effect.fail(toError(error)))
         }
       )
     })
-    : Effect.succeed(value)
+    : succeedMiddlewareResult<T>(value)
 )
 
 export type MiddlewareContext = {
@@ -80,7 +89,9 @@ export const applyRequestMiddleware = (
         continue
       }
 
-      const result = yield* toPromiseEffect(item.onRequest(createMiddlewareParams(nextRequest, context)))
+      const result = yield* toPromiseEffect<Request | Response>(
+        item.onRequest(createMiddlewareParams(nextRequest, context))
+      )
 
       if (result === undefined) {
         continue
@@ -116,10 +127,12 @@ export const applyResponseMiddleware = (
         continue
       }
 
-      const result = yield* toPromiseEffect(item.onResponse({
-        ...createMiddlewareParams(request, context),
-        response: nextResponse
-      }))
+      const result = yield* toPromiseEffect<Response>(
+        item.onResponse({
+          ...createMiddlewareParams(request, context),
+          response: nextResponse
+        })
+      )
 
       if (result === undefined) {
         continue
@@ -160,10 +173,12 @@ export const applyErrorMiddleware = (
         continue
       }
 
-      const rawResult = yield* toPromiseEffect(item.onError({
-        ...createMiddlewareParams(request, context),
-        error: nextError
-      }))
+      const rawResult = yield* toPromiseEffect<Response | Error>(
+        item.onError({
+          ...createMiddlewareParams(request, context),
+          error: nextError
+        })
+      )
 
       const result = yield* normalizeErrorResult(rawResult)
       if (result instanceof Response) {
