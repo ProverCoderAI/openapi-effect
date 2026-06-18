@@ -1,5 +1,11 @@
 # @effect-template/app
 
+## 1.0.25
+
+### Patch Changes
+
+- chore: automated version bump
+
 ## 1.0.24
 
 ### Patch Changes
