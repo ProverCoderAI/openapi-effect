@@ -31,8 +31,8 @@ const apiClient = createClientEffect<Paths>(clientOptions)
 const listPetsProgram = apiClient.GET("/pets", {
   params: { query: { limit: 10 } }
 }).pipe(
-    Effect.flatMap((success) =>
-      Match.value(success).pipe(
+  Effect.flatMap((success) =>
+    Match.value(success).pipe(
       Match.when({ status: 200 }, ({ body }) => Console.log(`Got ${body.length} pets`)),
       Match.exhaustive
     )
