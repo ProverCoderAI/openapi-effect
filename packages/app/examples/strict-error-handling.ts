@@ -4,12 +4,15 @@
 // REF: PR#3 blocking review from skulidropek
 // SOURCE: n/a
 // PURITY: SHELL
-// EFFECT: Effect<void, never, never> - all errors handled
+// EFFECT: Effect<ReadonlyArray<Pet>, never, never> - all errors handled with an empty-list fallback
 
 import { Console, Effect, Match } from "effect"
 
 import { type ClientOptions, createClientEffect } from "../src/index.js"
-import type { Paths } from "../tests/fixtures/petstore.openapi.js"
+import type { Components, Paths } from "../tests/fixtures/petstore.openapi.js"
+
+type Pet = Components["schemas"]["Pet"]
+type Pets = ReadonlyArray<Pet>
 
 const clientOptions: ClientOptions = {
   baseUrl: "https://petstore.example.com",
@@ -28,28 +31,52 @@ const clientOptions: ClientOptions = {
 // COMPLEXITY: O(1)
 const apiClient = createClientEffect<Paths>(clientOptions)
 
-const listPetsProgram = apiClient.GET("/pets", {
+const emptyPets: Pets = []
+
+/**
+ * Converts a handled listPets failure into the list monoid identity.
+ *
+ * @param logEffect - Diagnostic shell effect that records the handled failure
+ * @returns Effect with an empty pets list and no error channel
+ *
+ * @pure false - preserves Console logging effect
+ * @effect never
+ * @invariant forall handledFailure: recoverWithEmptyPets(handledFailure) = []
+ * @complexity O(1)
+ * @throws Never - all failures are represented in the Effect error channel
+ */
+const recoverWithEmptyPets = (logEffect: Effect.Effect<void>): Effect.Effect<Pets> =>
+  logEffect.pipe(Effect.as(emptyPets))
+
+const listPetsProgram: Effect.Effect<Pets> = apiClient.GET("/pets", {
   params: { query: { limit: 10 } }
 }).pipe(
   Effect.flatMap((success) =>
     Match.value(success).pipe(
-      Match.when({ status: 200 }, ({ body }) => Console.log(`Got ${body.length} pets`)),
+      Match.when({ status: 200 }, ({ body }) =>
+        Console.log(`Got ${body.length} pets`).pipe(Effect.as(body))
+      ),
       Match.exhaustive
     )
   ),
   Effect.catchTags({
     HttpError: (error) =>
       Match.value(error.status).pipe(
-        Match.when(500, () => Console.log(`Server error: ${error.body.message}`)),
+        Match.when(500, () =>
+          recoverWithEmptyPets(Console.log(`Server error: ${error.body.message}`))
+        ),
         Match.exhaustive
       ),
-    TransportError: ({ error }) => Console.log(`Transport error: ${error.message}`),
-    UnexpectedStatus: ({ body, status }) => Console.log(`Unexpected status ${status}: ${body}`),
+    TransportError: ({ error }) => recoverWithEmptyPets(Console.log(`Transport error: ${error.message}`)),
+    UnexpectedStatus: ({ body, status }) =>
+      recoverWithEmptyPets(Console.log(`Unexpected status ${status}: ${body}`)),
     UnexpectedContentType: ({ actual, expected }) =>
-      Console.log(`Unexpected content type ${actual ?? "unknown"}; expected ${expected.join(", ")}`),
-    ParseError: ({ error }) => Console.log(`Parse error: ${error.message}`),
-    DecodeError: ({ error }) => Console.log(`Decode error: ${error.message}`)
+      recoverWithEmptyPets(
+        Console.log(`Unexpected content type ${actual ?? "unknown"}; expected ${expected.join(", ")}`)
+      ),
+    ParseError: ({ error }) => recoverWithEmptyPets(Console.log(`Parse error: ${error.message}`)),
+    DecodeError: ({ error }) => recoverWithEmptyPets(Console.log(`Decode error: ${error.message}`))
   })
 )
 
-export const strictErrorHandlingProgram: Effect.Effect<void> = listPetsProgram
+export const strictErrorHandlingProgram: Effect.Effect<Pets> = listPetsProgram
