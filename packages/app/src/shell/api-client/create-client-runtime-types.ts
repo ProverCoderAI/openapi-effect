@@ -1,5 +1,6 @@
 import type { Effect } from "effect"
 
+import type { BoundaryError } from "../../core/api-client/strict-types.js"
 import type { MiddlewareContext } from "./create-client-middleware.js"
 import type {
   BodySerializer,
@@ -19,6 +20,18 @@ export type RuntimeFetchResponse = {
   response: Response
 }
 
+export type RuntimeApiSuccess = {
+  readonly status: number
+  readonly contentType: string
+  readonly body: unknown
+}
+
+export type RuntimeHttpError = RuntimeApiSuccess & {
+  readonly _tag: "HttpError"
+}
+
+export type RuntimeEffectFailure = RuntimeHttpError | BoundaryError
+
 export type RuntimeFetchOptions = Omit<RequestInit, "body" | "headers" | "method"> & {
   baseUrl?: string
   fetch?: NonNullable<ClientOptions["fetch"]>
@@ -35,19 +48,22 @@ export type RuntimeFetchOptions = Omit<RequestInit, "body" | "headers" | "method
   [key: string]: unknown
 }
 
-export type RuntimeClient = {
-  request: (method: string, url: string, init?: RuntimeFetchOptions) => Effect.Effect<RuntimeFetchResponse, Error>
-  GET: (url: string, init?: RuntimeFetchOptions) => Effect.Effect<RuntimeFetchResponse, Error>
-  PUT: (url: string, init?: RuntimeFetchOptions) => Effect.Effect<RuntimeFetchResponse, Error>
-  POST: (url: string, init?: RuntimeFetchOptions) => Effect.Effect<RuntimeFetchResponse, Error>
-  DELETE: (url: string, init?: RuntimeFetchOptions) => Effect.Effect<RuntimeFetchResponse, Error>
-  OPTIONS: (url: string, init?: RuntimeFetchOptions) => Effect.Effect<RuntimeFetchResponse, Error>
-  HEAD: (url: string, init?: RuntimeFetchOptions) => Effect.Effect<RuntimeFetchResponse, Error>
-  PATCH: (url: string, init?: RuntimeFetchOptions) => Effect.Effect<RuntimeFetchResponse, Error>
-  TRACE: (url: string, init?: RuntimeFetchOptions) => Effect.Effect<RuntimeFetchResponse, Error>
+export type RuntimeClientFor<Success, Failure> = {
+  request: (method: string, url: string, init?: RuntimeFetchOptions) => Effect.Effect<Success, Failure>
+  GET: (url: string, init?: RuntimeFetchOptions) => Effect.Effect<Success, Failure>
+  PUT: (url: string, init?: RuntimeFetchOptions) => Effect.Effect<Success, Failure>
+  POST: (url: string, init?: RuntimeFetchOptions) => Effect.Effect<Success, Failure>
+  DELETE: (url: string, init?: RuntimeFetchOptions) => Effect.Effect<Success, Failure>
+  OPTIONS: (url: string, init?: RuntimeFetchOptions) => Effect.Effect<Success, Failure>
+  HEAD: (url: string, init?: RuntimeFetchOptions) => Effect.Effect<Success, Failure>
+  PATCH: (url: string, init?: RuntimeFetchOptions) => Effect.Effect<Success, Failure>
+  TRACE: (url: string, init?: RuntimeFetchOptions) => Effect.Effect<Success, Failure>
   use: (...middleware: Array<Middleware>) => void
   eject: (...middleware: Array<Middleware>) => void
 }
+
+export type RuntimeClient = RuntimeClientFor<RuntimeFetchResponse, Error>
+export type RuntimeEffectClient = RuntimeClientFor<RuntimeApiSuccess, RuntimeEffectFailure>
 
 export type HeaderValue =
   | string

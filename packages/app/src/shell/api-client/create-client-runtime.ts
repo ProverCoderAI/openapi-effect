@@ -1,7 +1,7 @@
 import { Effect } from "effect"
 
 import { applyErrorMiddleware, applyRequestMiddleware, applyResponseMiddleware } from "./create-client-middleware.js"
-import { createResponseEnvelope } from "./create-client-response.js"
+import { createResponseEnvelope, createStrictResponseEffect, toTransportError } from "./create-client-response.js"
 import {
   createMergedOptions,
   invokeFetch,
@@ -13,10 +13,12 @@ import {
   toHeaderOverrides
 } from "./create-client-runtime-helpers.js"
 import type { SerializedBody } from "./create-client-runtime-helpers.js"
+import { createClientMethods } from "./create-client-runtime-methods.js"
 import type {
   BaseRuntimeConfig,
   PreparedRequest,
   RuntimeClient,
+  RuntimeEffectClient,
   RuntimeFetchOptions,
   RuntimeFetchResponse
 } from "./create-client-runtime-types.js"
@@ -243,9 +245,18 @@ const createCoreFetch = (config: BaseRuntimeConfig) =>
     return yield* createResponseEnvelope(execution.request, execution.response, prepared.parseAs)
   })
 
-const hasMiddlewareHook = (value: Middleware): boolean => (
-  "onRequest" in value || "onResponse" in value || "onError" in value
-)
+const createCoreEffectFetch = (config: BaseRuntimeConfig) =>
+(
+  schemaPath: string,
+  fetchOptions?: RuntimeFetchOptions
+) =>
+  Effect.gen(function*() {
+    const prepared = prepareRequest(config, schemaPath, fetchOptions)
+    const execution = yield* executeFetch(prepared).pipe(
+      Effect.mapError(toTransportError)
+    )
+    return yield* createStrictResponseEffect(execution.request, execution.response, prepared.parseAs)
+  })
 
 const createBaseRuntimeConfig = (
   clientOptions: ClientOptions | undefined,
@@ -277,40 +288,16 @@ const createBaseRuntimeConfig = (
   }
 }
 
-const createClientMethods = (
-  coreFetch: ReturnType<typeof createCoreFetch>,
-  globalMiddlewares: Array<Middleware>
-): RuntimeClient => ({
-  request: (method, url, init) => coreFetch(url, { ...init, method: method.toUpperCase() }),
-  GET: (url, init) => coreFetch(url, { ...init, method: "GET" }),
-  PUT: (url, init) => coreFetch(url, { ...init, method: "PUT" }),
-  POST: (url, init) => coreFetch(url, { ...init, method: "POST" }),
-  DELETE: (url, init) => coreFetch(url, { ...init, method: "DELETE" }),
-  OPTIONS: (url, init) => coreFetch(url, { ...init, method: "OPTIONS" }),
-  HEAD: (url, init) => coreFetch(url, { ...init, method: "HEAD" }),
-  PATCH: (url, init) => coreFetch(url, { ...init, method: "PATCH" }),
-  TRACE: (url, init) => coreFetch(url, { ...init, method: "TRACE" }),
-  use: (...middleware) => {
-    for (const item of middleware) {
-      if (!hasMiddlewareHook(item)) {
-        throw new Error("Middleware must be an object with one of `onRequest()`, `onResponse() or `onError()`")
-      }
-      globalMiddlewares.push(item)
-    }
-  },
-  eject: (...middleware) => {
-    for (const item of middleware) {
-      const index = globalMiddlewares.indexOf(item)
-      if (index !== -1) {
-        globalMiddlewares.splice(index, 1)
-      }
-    }
-  }
-})
-
 export const createRuntimeClient = (clientOptions?: ClientOptions): RuntimeClient => {
   const globalMiddlewares: Array<Middleware> = []
   const config = createBaseRuntimeConfig(clientOptions, globalMiddlewares)
   const coreFetch = createCoreFetch(config)
+  return createClientMethods(coreFetch, globalMiddlewares)
+}
+
+export const createRuntimeEffectClient = (clientOptions?: ClientOptions): RuntimeEffectClient => {
+  const globalMiddlewares: Array<Middleware> = []
+  const config = createBaseRuntimeConfig(clientOptions, globalMiddlewares)
+  const coreFetch = createCoreEffectFetch(config)
   return createClientMethods(coreFetch, globalMiddlewares)
 }

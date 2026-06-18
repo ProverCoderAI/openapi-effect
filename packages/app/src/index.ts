@@ -10,8 +10,19 @@ export type * from "./core/api-client/index.js"
 export { assertNever } from "./core/api-client/index.js"
 
 export type {
+  Client,
+  ClientEffect,
   ClientOptions,
   DispatchersFor,
+  EffectClient,
+  EffectClientMethod,
+  EffectClientRequestMethod,
+  FetchOptions,
+  FetchResponse,
+  Middleware,
+  PathBasedClient,
+  QuerySerializer,
+  QuerySerializerOptions,
   StrictApiClient,
   StrictApiClientWithDispatchers
 } from "./shell/api-client/create-client.js"

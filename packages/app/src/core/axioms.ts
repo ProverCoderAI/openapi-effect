@@ -141,3 +141,12 @@ export const asStrictApiClient = <T>(client: object): T => client as T
  * @pure true
  */
 export const asDispatchersFor = <T>(value: unknown): T => value as T
+
+/**
+ * Cast middleware callback output after async boundary normalization.
+ * AXIOM: Middleware runtime validation checks the concrete Request/Response/Error
+ * shape before the value is used to modify execution.
+ *
+ * @pure true
+ */
+export const asMiddlewareResult = <T>(value: unknown): T => value as T
