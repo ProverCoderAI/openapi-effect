@@ -1,67 +1,35 @@
-// CHANGE: Main entry point for api-client shell module
-// WHY: Export public API with clear separation of concerns
-// QUOTE(ТЗ): "Публичный API должен иметь вид: strictClient.GET(path, options): Effect<ApiResponse<Op>, BoundaryError, never>"
-// REF: issue-2, section 6
+// CHANGE: Main entry point for the openapi-effect shell module
+// WHY: Export only the Effect client API and its openapi-fetch-compatible input helpers
+// QUOTE(ТЗ): "итоговый тип возвращался от effect а не promise"
+// REF: user-msg-openapi-effect-only
 // SOURCE: n/a
 // PURITY: SHELL (re-exports)
 // COMPLEXITY: O(1)
 
-// Shell types and functions (runtime)
 export type {
-  Decoder,
-  Dispatcher,
-  RawResponse,
-  RequestOptions,
-  StrictClient,
-  StrictRequestInit
-} from "./strict-client.js"
-
-export {
-  createDispatcher,
-  createStrictClient,
-  createUniversalDispatcher,
-  executeRequest,
-  parseJSON,
-  unexpectedContentType,
-  unexpectedStatus
-} from "./strict-client.js"
-
-// High-level client creation API
-export type {
-  Client,
   ClientEffect,
-  ClientForPath,
   ClientOptions,
-  DispatchersFor,
   EffectClient,
   EffectClientMethod,
   EffectClientRequestMethod,
   FetchOptions,
-  FetchResponse,
   HeadersOptions,
   Middleware,
   ParseAs,
-  PathBasedClient,
   QuerySerializer,
   QuerySerializerOptions,
   RequestBodyOption,
-  RequestOptions as FetchRequestOptions,
-  StrictApiClient,
-  StrictApiClientWithDispatchers
+  RequestOptions
 } from "./create-client.js"
 export {
-  createClient,
   createClientEffect,
   createFinalURL,
-  createPathBasedClient,
   createQuerySerializer,
   defaultBodySerializer,
   defaultPathSerializer,
   mergeHeaders,
-  registerDefaultDispatchers,
   removeTrailingSlash,
   serializeArrayParam,
   serializeObjectParam,
-  serializePrimitiveParam,
-  wrapAsPathBasedClient
+  serializePrimitiveParam
 } from "./create-client.js"

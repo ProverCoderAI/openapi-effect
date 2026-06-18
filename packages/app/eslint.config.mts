@@ -4,7 +4,6 @@ import eslint from '@eslint/js';
 import { defineConfig } from 'eslint/config';
 import tseslint from 'typescript-eslint';
 import vitest from "@vitest/eslint-plugin";
-import suggestMembers from "@prover-coder-ai/eslint-plugin-suggest-members";
 import sonarjs from "eslint-plugin-sonarjs";
 import unicorn from "eslint-plugin-unicorn";
 import * as effectEslint from "@effect/eslint-plugin";
@@ -37,7 +36,6 @@ export default defineConfig(
   eslint.configs.recommended,
   tseslint.configs.strictTypeChecked,
   effectEslint.configs.dprint,
-  suggestMembers.configs.recommended,
   eslintCommentsConfigs.recommended,
   {
     name: "analyzers",

@@ -1,7 +1,7 @@
 import { Effect } from "effect"
 
 import { applyErrorMiddleware, applyRequestMiddleware, applyResponseMiddleware } from "./create-client-middleware.js"
-import { createResponseEnvelope, createStrictResponseEffect, toTransportError } from "./create-client-response.js"
+import { createStrictResponseEffect, toTransportError } from "./create-client-response.js"
 import {
   createMergedOptions,
   invokeFetch,
@@ -17,10 +17,8 @@ import { createClientMethods } from "./create-client-runtime-methods.js"
 import type {
   BaseRuntimeConfig,
   PreparedRequest,
-  RuntimeClient,
   RuntimeEffectClient,
-  RuntimeFetchOptions,
-  RuntimeFetchResponse
+  RuntimeFetchOptions
 } from "./create-client-runtime-types.js"
 import type {
   BodySerializer,
@@ -234,17 +232,6 @@ const executeFetch = (
   })
 }
 
-const createCoreFetch = (config: BaseRuntimeConfig) =>
-(
-  schemaPath: string,
-  fetchOptions?: RuntimeFetchOptions
-): Effect.Effect<RuntimeFetchResponse, Error> =>
-  Effect.gen(function*() {
-    const prepared = prepareRequest(config, schemaPath, fetchOptions)
-    const execution = yield* executeFetch(prepared)
-    return yield* createResponseEnvelope(execution.request, execution.response, prepared.parseAs)
-  })
-
 const createCoreEffectFetch = (config: BaseRuntimeConfig) =>
 (
   schemaPath: string,
@@ -286,13 +273,6 @@ const createBaseRuntimeConfig = (
     baseOptions,
     globalMiddlewares
   }
-}
-
-export const createRuntimeClient = (clientOptions?: ClientOptions): RuntimeClient => {
-  const globalMiddlewares: Array<Middleware> = []
-  const config = createBaseRuntimeConfig(clientOptions, globalMiddlewares)
-  const coreFetch = createCoreFetch(config)
-  return createClientMethods(coreFetch, globalMiddlewares)
 }
 
 export const createRuntimeEffectClient = (clientOptions?: ClientOptions): RuntimeEffectClient => {
