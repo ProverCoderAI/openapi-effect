@@ -14,12 +14,6 @@ import type {
   QuerySerializerOptions
 } from "./create-client-types.js"
 
-export type RuntimeFetchResponse = {
-  data?: unknown
-  error?: unknown
-  response: Response
-}
-
 export type RuntimeApiSuccess = {
   readonly status: number
   readonly contentType: string
@@ -62,7 +56,6 @@ export type RuntimeClientFor<Success, Failure> = {
   eject: (...middleware: Array<Middleware>) => void
 }
 
-export type RuntimeClient = RuntimeClientFor<RuntimeFetchResponse, Error>
 export type RuntimeEffectClient = RuntimeClientFor<RuntimeApiSuccess, RuntimeEffectFailure>
 
 export type HeaderValue =

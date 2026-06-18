@@ -13,21 +13,6 @@
  * JSON value type - result of JSON.parse()
  * This is the fundamental type for all parsed JSON values
  */
-/**
- * Cast function for dispatcher factory
- * AXIOM: Dispatcher factory receives valid classify function
- *
- * This enables generated dispatchers to work with heterogeneous Effect unions.
- * The cast is safe because:
- * 1. The classify function is generated from OpenAPI schema
- * 2. All status/content-type combinations are exhaustively covered
- * 3. The returned Effect conforms to Dispatcher signature
- *
- * @pure true
- */
-import type { Effect } from "effect"
-import type { ApiFailure, ApiSuccess, TransportError } from "./api-client/strict-types.js"
-
 export type Json =
   | null
   | boolean
@@ -47,81 +32,6 @@ export type Json =
 export const asJson = (value: unknown): Json => value as Json
 
 /**
- * Cast a value to a specific type with const assertion
- * Used for creating literal typed objects in generated code
- *
- * @pure true
- */
-export const asConst = <T>(value: T): T => value
-
-/**
- * Create a typed RawResponse from raw values
- * AXIOM: HTTP response structure is known at runtime
- *
- * @pure true
- */
-export type RawResponse = {
-  readonly status: number
-  readonly headers: Headers
-  readonly text: string
-}
-
-export const asRawResponse = (value: {
-  status: number
-  headers: Headers
-  text: string
-}): RawResponse => value as RawResponse
-
-/**
- * Dispatcher classifies response and applies decoder
- *
- * NEW DESIGN (Effect-native):
- * - Success channel: `ApiSuccess<Responses>` (2xx responses only)
- * - Error channel: `ApiFailure<Responses>` (non-2xx schema errors + boundary errors)
- *
- * This forces developers to explicitly handle HTTP errors (404, 500, etc.)
- * using Effect.catchTag, Effect.match, or similar patterns.
- *
- * @pure false - applies decoders
- * @effect Effect<ApiSuccess, HttpError | BoundaryError, never>
- * @invariant Must handle all statuses and content-types from schema
- */
-export type Dispatcher<Responses> = (
-  response: RawResponse
-) => Effect.Effect<
-  ApiSuccess<Responses>,
-  Exclude<ApiFailure<Responses>, TransportError>
->
-
-export const asDispatcher = <Responses>(
-  fn: (response: RawResponse) => Effect.Effect<unknown, unknown>
-): Dispatcher<Responses> => fn as Dispatcher<Responses>
-
-/**
- * Cast for StrictRequestInit config object
- * AXIOM: Config object has correct structure when all properties assigned
- *
- * @pure true
- */
-export const asStrictRequestInit = <T>(config: object): T => config as T
-
-/**
- * Classifier function type for dispatcher creation
- * AXIOM: Classify function returns Effect with heterogeneous union types
- *
- * This type uses `unknown` to allow the classify function to return
- * heterogeneous Effect unions from switch statements. The actual types
- * are enforced by the generated dispatcher code.
- *
- * @pure true
- */
-export type ClassifyFn = (
-  status: number,
-  contentType: string | undefined,
-  text: string
-) => Effect.Effect<unknown, unknown>
-
-/**
  * Cast internal client implementation to typed StrictApiClient
  * AXIOM: Client implementation correctly implements all method constraints
  *
@@ -133,14 +43,6 @@ export type ClassifyFn = (
  * @pure true
  */
 export const asStrictApiClient = <T>(client: object): T => client as T
-
-/**
- * Cast default dispatchers registry to specific schema type
- * AXIOM: Default dispatcher registry was registered for the current Paths type
- *
- * @pure true
- */
-export const asDispatchersFor = <T>(value: unknown): T => value as T
 
 /**
  * Cast middleware callback output after async boundary normalization.

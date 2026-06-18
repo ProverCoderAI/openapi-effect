@@ -12,8 +12,8 @@ type Pkg = {
   peerDependencies?: Record<string, string> | undefined
 }
 
-// CHANGE: Build both the library entry (src/index.ts) and the CLI entry (src/app/main.ts).
-// WHY: Consumers need a JS entrypoint in dist for `import "openapi-effect"`, while we keep the template CLI working.
+// CHANGE: Build only the openapi-effect library entry.
+// WHY: The package is a library, not a CLI application.
 // SOURCE: n/a
 const pkgPath = path.resolve(__dirname, "package.json")
 const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8")) as Pkg
@@ -37,8 +37,7 @@ export default defineConfig({
     rollupOptions: {
       preserveEntrySignatures: "exports-only",
       input: {
-        index: path.resolve(__dirname, "src/index.ts"),
-        main: path.resolve(__dirname, "src/app/main.ts")
+        index: path.resolve(__dirname, "src/index.ts")
       },
       external: isExternal,
       output: {
