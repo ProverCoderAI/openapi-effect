@@ -19,8 +19,7 @@ const pkgPath = path.resolve(__dirname, "package.json")
 const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8")) as Pkg
 const dependencies = [...Object.keys(pkg.dependencies ?? {}), ...Object.keys(pkg.peerDependencies ?? {})]
 
-const isExternal = (id: string): boolean =>
-  dependencies.some((dep) => id === dep || id.startsWith(`${dep}/`))
+const isExternal = (id: string): boolean => dependencies.some((dep) => id === dep || id.startsWith(`${dep}/`))
 
 export default defineConfig({
   plugins: [tsconfigPaths()],
