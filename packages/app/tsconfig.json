@@ -3,19 +3,31 @@
 	"compilerOptions": {
 		"rootDir": ".",
 		"outDir": "dist",
-		"types": ["vitest", "node"],
-		"lib": ["ES2022", "DOM", "DOM.Iterable"],
+		"types": [
+			"vitest",
+			"node"
+		],
+		"lib": [
+			"ES2022",
+			"DOM",
+			"DOM.Iterable"
+		],
 		"baseUrl": ".",
 		"paths": {
-			"@/*": ["src/*"]
+			"@/*": [
+				"src/*"
+			]
 		}
 	},
 	"include": [
 		"src/**/*",
 		"tests/**/*",
-		"examples/strict-error-handling.ts",
+		"src/examples/strict-error-handling.ts",
 		"vite.config.ts",
 		"vitest.config.ts"
 	],
-	"exclude": ["dist", "node_modules"]
+	"exclude": [
+		"dist",
+		"node_modules"
+	]
 }
