@@ -27,7 +27,7 @@
     "check": "tsc --noEmit",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "test:consumer": "tsc -p tests/consumer/tsconfig.json"
+    "test:consumer": "tsc -p tsconfig.build.json && tsc -p tests/consumer/tsconfig.json"
   },
   "repository": {
     "type": "git",
