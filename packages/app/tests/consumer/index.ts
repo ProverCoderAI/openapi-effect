@@ -18,6 +18,5 @@ type Paths = {
 
 const client = createClientEffect<Paths>()
 
-// Verify .GET exists and returns something (compile-time check only)
-const _result = client.GET("/health")
-void _result
+// Verify .GET exists and returns something (compile-time only)
+client.GET("/health")
