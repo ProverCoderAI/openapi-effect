@@ -1,6 +1,6 @@
 {
   "name": "@prover-coder-ai/openapi-effect",
-  "version": "1.0.26",
+  "version": "1.0.27",
   "description": "openapi-fetch-compatible client that returns Effect values",
   "type": "module",
   "main": "dist/index.js",
