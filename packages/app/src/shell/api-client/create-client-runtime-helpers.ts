@@ -21,8 +21,45 @@ export const supportsRequestInitExt = (): boolean => (
   && typeof process.versions["undici"] === "string"
 )
 
+const fallbackRandomIdLength = 9
+const fallbackRandomHexBytes = 5
+let fallbackRequestCounter = 0
+
+const truncateRandomId = (value: string): string => value.slice(0, fallbackRandomIdLength)
+
+const webCrypto = (): Crypto | undefined => (
+  "crypto" in globalThis ? globalThis.crypto : undefined
+)
+
+const randomIdFromUuid = (): string | undefined => {
+  const cryptoApi = webCrypto()
+  return typeof cryptoApi?.randomUUID === "function"
+    ? truncateRandomId(cryptoApi.randomUUID().replaceAll("-", ""))
+    : undefined
+}
+
+const randomIdFromGetRandomValues = (): string | undefined => {
+  const cryptoApi = webCrypto()
+  if (typeof cryptoApi?.getRandomValues !== "function") {
+    return undefined
+  }
+
+  const bytes = new Uint8Array(fallbackRandomHexBytes)
+  cryptoApi.getRandomValues(bytes)
+  return truncateRandomId(Array.from(bytes, (value) => value.toString(16).padStart(2, "0")).join(""))
+}
+
+const randomIdFromClock = (): string => {
+  const timestamp = Date.now().toString(16)
+  const counter = fallbackRequestCounter.toString(16).padStart(2, "0")
+  fallbackRequestCounter = (fallbackRequestCounter + 1) % 256
+  return `${timestamp}${counter}`.slice(-fallbackRandomIdLength).padStart(fallbackRandomIdLength, "0")
+}
+
 export const randomID = (): string => (
-  globalThis.crypto.randomUUID().replaceAll("-", "").slice(0, 9)
+  randomIdFromUuid()
+  ?? randomIdFromGetRandomValues()
+  ?? randomIdFromClock()
 )
 
 const isQuerySerializerOptions = (

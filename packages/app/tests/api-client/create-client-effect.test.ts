@@ -9,7 +9,7 @@
 // COMPLEXITY: O(1) per test
 
 import { Effect, Either } from "effect"
-import { describe, expect, it } from "vitest"
+import { afterEach, describe, expect, it, vi } from "vitest"
 
 import type { paths } from "../../src/core/api/openapi.js"
 import type { ClientOptions } from "../../src/shell/api-client/create-client-types.js"
@@ -33,6 +33,11 @@ const createMockFetch = (
 
 const createFailingFetch = (message: string) => (_request: Request) =>
   Effect.runPromise(Effect.fail(new Error(message)))
+
+afterEach(() => {
+  vi.restoreAllMocks()
+  vi.unstubAllGlobals()
+})
 
 describe("createClientEffect", () => {
   it("returns success envelope for login 200", () =>
@@ -146,5 +151,57 @@ describe("createClientEffect", () => {
           expect(outcome.left.error.message).toContain("network down")
         }
       }
+    }).pipe(Effect.runPromise))
+
+  it("uses getRandomValues when randomUUID is unavailable", () =>
+    Effect.gen(function*() {
+      const capturedIds: Array<string> = []
+      vi.stubGlobal("crypto", {
+        getRandomValues: (values: Uint8Array): Uint8Array => {
+          values.set([0x10, 0x32, 0x54, 0x76, 0x98])
+          return values
+        }
+      })
+
+      const apiClientEffect = createClientEffect<AuthPaths>({
+        baseUrl: "https://petstore.example.com",
+        credentials: "include",
+        fetch: createMockFetch(200, { "content-type": "application/json" }, JSON.stringify({ ok: true }))
+      })
+
+      apiClientEffect.use({
+        onRequest: ({ id }) => {
+          capturedIds.push(id)
+        }
+      })
+
+      const result = yield* apiClientEffect.GET("/api/auth/me")
+
+      expect(result.status).toBe(200)
+      expect(capturedIds).toEqual(["103254769"])
+    }).pipe(Effect.runPromise))
+
+  it("falls back to a clock-based request id when Web Crypto is missing", () =>
+    Effect.gen(function*() {
+      const capturedIds: Array<string> = []
+      vi.stubGlobal("crypto", undefined)
+      vi.spyOn(Date, "now").mockReturnValue(0x1234567)
+
+      const apiClientEffect = createClientEffect<AuthPaths>({
+        baseUrl: "https://petstore.example.com",
+        credentials: "include",
+        fetch: createMockFetch(200, { "content-type": "application/json" }, JSON.stringify({ ok: true }))
+      })
+
+      apiClientEffect.use({
+        onRequest: ({ id }) => {
+          capturedIds.push(id)
+        }
+      })
+
+      const result = yield* apiClientEffect.GET("/api/auth/me")
+
+      expect(result.status).toBe(200)
+      expect(capturedIds).toEqual(["123456700"])
     }).pipe(Effect.runPromise))
 })
